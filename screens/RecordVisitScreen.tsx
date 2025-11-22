@@ -46,7 +46,15 @@ export default function RecordVisitScreen() {
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
   const [permissionGranted, setPermissionGranted] = useState(false);
   
+  const [reviewMode, setReviewMode] = useState(false);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [recordedUri, setRecordedUri] = useState<string | null>(null);
+  
   const recordingRef = useRef<Audio.Recording | null>(null);
+  const soundRef = useRef<Audio.Sound | null>(null);
   const pulse = useSharedValue(1);
 
   useEffect(() => {
@@ -54,10 +62,17 @@ export default function RecordVisitScreen() {
   }, [recording]);
 
   useEffect(() => {
+    soundRef.current = sound;
+  }, [sound]);
+
+  useEffect(() => {
     requestPermissions();
     return () => {
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(console.error);
+      }
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(console.error);
       }
     };
   }, []);
@@ -150,6 +165,11 @@ export default function RecordVisitScreen() {
     }
     
     try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+      });
+      
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -194,13 +214,104 @@ export default function RecordVisitScreen() {
         return;
       }
 
+      setRecordedUri(audioUri);
+      setRecording(null);
+      setIsRecording(false);
+      setIsPaused(false);
+      setReviewMode(true);
+      
+      await loadAudioForPlayback(audioUri);
+    } catch (error) {
+      console.error("Failed to stop recording:", error);
+      Alert.alert("Recording Error", "Could not save the recording. Please try again.");
+      setRecording(null);
+      setIsRecording(false);
+      setIsPaused(false);
+    }
+  };
+
+  const loadAudioForPlayback = async (uri: string) => {
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+      
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri },
+        { shouldPlay: false },
+        onPlaybackStatusUpdate
+      );
+      setSound(newSound);
+    } catch (error) {
+      console.error("Failed to load audio for playback:", error);
+      Alert.alert("Playback Error", "Could not load the recording for playback.");
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPlaybackPosition(status.positionMillis);
+      setPlaybackDuration(status.durationMillis || 0);
+      setIsPlaying(status.isPlaying);
+      
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const handlePlayPause = async () => {
+    if (!sound) return;
+    
+    try {
+      if (isPlaying) {
+        await sound.pauseAsync();
+      } else {
+        await sound.playAsync();
+      }
+    } catch (error) {
+      console.error("Failed to play/pause audio:", error);
+      Alert.alert("Playback Error", "Could not play the recording.");
+    }
+  };
+
+  const handleReRecord = async () => {
+    if (sound) {
+      await sound.unloadAsync();
+      setSound(null);
+    }
+    
+    await Audio.setAudioModeAsync({
+      allowsRecordingIOS: true,
+      playsInSilentModeIOS: true,
+    });
+    
+    setReviewMode(false);
+    setRecordedUri(null);
+    setPlaybackPosition(0);
+    setPlaybackDuration(0);
+    setIsPlaying(false);
+    setSeconds(0);
+    setDoctorName("");
+  };
+
+  const handleSaveVisit = async () => {
+    if (!recordedUri) return;
+    
+    try {
+      if (sound) {
+        await sound.unloadAsync();
+        setSound(null);
+      }
+
       const visitId = Date.now().toString();
       const visit = {
         id: visitId,
         date: new Date(),
         doctorName: doctorName || "Not specified",
         duration: seconds,
-        audioUri: audioUri,
+        audioUri: recordedUri,
         summary: null,
         keyPoints: [],
         diagnoses: [],
@@ -210,9 +321,6 @@ export default function RecordVisitScreen() {
       };
       
       addVisit(visit);
-      setRecording(null);
-      setIsRecording(false);
-      setIsPaused(false);
       navigation.goBack();
       
       setTimeout(async () => {
@@ -223,13 +331,19 @@ export default function RecordVisitScreen() {
         });
       }, 3000);
     } catch (error) {
-      console.error("Failed to stop recording:", error);
-      Alert.alert("Recording Error", "Could not save the recording. Please try again.");
-      setRecording(null);
-      setIsRecording(false);
-      setIsPaused(false);
+      console.error("Failed to save visit:", error);
+      Alert.alert("Error", "Could not save the visit. Please try again.");
     }
   };
+
+  const formatPlaybackTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const playbackProgress = playbackDuration > 0 ? playbackPosition / playbackDuration : 0;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
@@ -237,31 +351,31 @@ export default function RecordVisitScreen() {
         <Pressable onPress={handleCancel} style={styles.headerButton}>
           <ThemedText style={styles.headerButtonText}>Cancel</ThemedText>
         </Pressable>
-        <ThemedText style={styles.headerTitle}>Recording Visit</ThemedText>
+        <ThemedText style={styles.headerTitle}>
+          {reviewMode ? "Review Recording" : "Recording Visit"}
+        </ThemedText>
         <View style={styles.headerButton} />
       </View>
 
-      <View style={styles.content}>
-        <Animated.View style={[styles.waveformContainer, pulseStyle]}>
-          <View
-            style={[
-              styles.waveform,
-              {
-                backgroundColor: isRecording && !isPaused ? "#FF6B6B" : theme.accent,
-              },
-            ]}
-          >
-            <Feather
-              name="mic"
-              size={48}
-              color="white"
-            />
+      {reviewMode ? (
+        <View style={styles.content}>
+          <View style={styles.waveformContainer}>
+            <View
+              style={[
+                styles.waveform,
+                { backgroundColor: theme.accent },
+              ]}
+            >
+              <Feather
+                name="headphones"
+                size={48}
+                color="white"
+              />
+            </View>
           </View>
-        </Animated.View>
 
-        <ThemedText style={styles.timer}>{formatTime(seconds)}</ThemedText>
+          <ThemedText style={styles.timer}>{formatTime(seconds)}</ThemedText>
 
-        {!isRecording && (
           <ThemedView style={[styles.inputCard, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
             <TextInput
               style={[styles.input, { color: "white" }]}
@@ -271,40 +385,123 @@ export default function RecordVisitScreen() {
               onChangeText={setDoctorName}
             />
           </ThemedView>
-        )}
 
-        <View style={styles.controls}>
-          {!isRecording ? (
+          <View style={styles.progressContainer}>
+            <View style={styles.progressBar}>
+              <View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: `${playbackProgress * 100}%`,
+                    backgroundColor: "white",
+                  },
+                ]}
+              />
+            </View>
+            <View style={styles.progressTime}>
+              <ThemedText style={styles.progressTimeText}>
+                {formatPlaybackTime(playbackPosition)}
+              </ThemedText>
+              <ThemedText style={styles.progressTimeText}>
+                {formatPlaybackTime(playbackDuration)}
+              </ThemedText>
+            </View>
+          </View>
+
+          <View style={styles.controls}>
             <Pressable
-              onPress={handleRecord}
-              style={[styles.recordButton, { backgroundColor: "#FF6B6B" }]}
+              onPress={handlePlayPause}
+              style={[styles.recordButton, { backgroundColor: theme.accent }]}
             >
-              <Feather name="circle" size={32} color="white" />
+              <Feather name={isPlaying ? "pause" : "play"} size={32} color="white" />
             </Pressable>
-          ) : (
-            <>
+          </View>
+
+          <View style={styles.reviewButtons}>
+            <Pressable
+              onPress={handleReRecord}
+              style={[styles.reviewButton, { backgroundColor: "rgba(255,255,255,0.2)" }]}
+            >
+              <Feather name="rotate-ccw" size={20} color="white" />
+              <ThemedText style={styles.reviewButtonText}>Re-record</ThemedText>
+            </Pressable>
+            <Pressable
+              onPress={handleSaveVisit}
+              style={[styles.reviewButton, { backgroundColor: "white" }]}
+            >
+              <Feather name="check" size={20} color={theme.primary} />
+              <ThemedText style={[styles.reviewButtonText, { color: theme.primary }]}>
+                Save Visit
+              </ThemedText>
+            </Pressable>
+          </View>
+        </View>
+      ) : (
+        <View style={styles.content}>
+          <Animated.View style={[styles.waveformContainer, pulseStyle]}>
+            <View
+              style={[
+                styles.waveform,
+                {
+                  backgroundColor: isRecording && !isPaused ? "#FF6B6B" : theme.accent,
+                },
+              ]}
+            >
+              <Feather
+                name="mic"
+                size={48}
+                color="white"
+              />
+            </View>
+          </Animated.View>
+
+          <ThemedText style={styles.timer}>{formatTime(seconds)}</ThemedText>
+
+          {!isRecording && (
+            <ThemedView style={[styles.inputCard, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+              <TextInput
+                style={[styles.input, { color: "white" }]}
+                placeholder="Doctor's name (optional)"
+                placeholderTextColor="rgba(255,255,255,0.6)"
+                value={doctorName}
+                onChangeText={setDoctorName}
+              />
+            </ThemedView>
+          )}
+
+          <View style={styles.controls}>
+            {!isRecording ? (
               <Pressable
-                onPress={handlePause}
-                style={[styles.controlButton, { backgroundColor: "rgba(255,255,255,0.3)" }]}
+                onPress={handleRecord}
+                style={[styles.recordButton, { backgroundColor: "#FF6B6B" }]}
               >
-                <Feather name={isPaused ? "play" : "pause"} size={24} color="white" />
+                <Feather name="circle" size={32} color="white" />
               </Pressable>
-              <Pressable
-                onPress={handleStop}
-                style={[styles.controlButton, { backgroundColor: theme.accent }]}
-              >
-                <Feather name="check" size={24} color="white" />
-              </Pressable>
-            </>
+            ) : (
+              <>
+                <Pressable
+                  onPress={handlePause}
+                  style={[styles.controlButton, { backgroundColor: "rgba(255,255,255,0.3)" }]}
+                >
+                  <Feather name={isPaused ? "play" : "pause"} size={24} color="white" />
+                </Pressable>
+                <Pressable
+                  onPress={handleStop}
+                  style={[styles.controlButton, { backgroundColor: theme.accent }]}
+                >
+                  <Feather name="check" size={24} color="white" />
+                </Pressable>
+              </>
+            )}
+          </View>
+
+          {!isRecording && (
+            <ThemedText style={styles.instruction}>
+              Find a quiet spot and tap to start recording
+            </ThemedText>
           )}
         </View>
-
-        {!isRecording && (
-          <ThemedText style={styles.instruction}>
-            Find a quiet spot and tap to start recording
-          </ThemedText>
-        )}
-      </View>
+      )}
     </View>
   );
 }
@@ -387,5 +584,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: "rgba(255,255,255,0.8)",
     textAlign: "center",
+  },
+  progressContainer: {
+    width: "100%",
+    marginBottom: Spacing["2xl"],
+  },
+  progressBar: {
+    width: "100%",
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: Spacing.sm,
+  },
+  progressFill: {
+    height: "100%",
+  },
+  progressTime: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  progressTimeText: {
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+  },
+  reviewButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+    marginTop: Spacing.xl,
+  },
+  reviewButton: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  reviewButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "white",
   },
 });
