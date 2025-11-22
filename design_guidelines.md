@@ -194,6 +194,7 @@
 - Avatar selection (3 presets, centered at top)
 - Display name input field
 - Settings sections:
+  - Reading Level: SMOG index preference (6th, 8th, 10th, 12th grade) - default 8th grade
   - Recording: Quality preference
   - Privacy: Auto-save toggle, data export button
   - About: App version, "Learn to Empower. Empower to Hope." tagline
@@ -223,6 +224,16 @@
 
 **Content Tone:**
 - Empowering, never condescending
-- Plain language explanations (8th-grade reading level for medical terms)
+- Plain language explanations (default 8th-grade reading level, adjustable via SMOG index in settings)
 - Acknowledge stress: "Take a breath. We're here to help."
 - Celebrate small wins: "Great job recording your 5th visit!"
+
+**SMOG Index & Readability:**
+- Track user's preferred reading level (SMOG index) in settings
+- All AI-generated content (summaries, explanations, chat responses) must be adjusted to match user's literacy level
+- Calculate SMOG index for AI responses and adjust complexity if needed
+- Display reading level indicator in settings to help users understand accessibility
+- Default to 8th grade (SMOG score ~8) for medical content accessibility
+- Formula: SMOG = 1.0430 × √(polysyllables × 30/sentences) + 3.1291
+  - Polysyllables = words with 3+ syllables
+  - Target: 6th grade (6-7), 8th grade (8-9), 10th grade (10-11), 12th grade (12+)
