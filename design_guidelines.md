@@ -21,16 +21,29 @@
 
 ## Architecture Decisions
 
-### Authentication
-**No authentication required** - This is a local-first, single-user app with AsyncStorage.
+### Authentication & Roles
+**Authentication required for admin features** - Regular users can use the app locally, but admin users need login to manage source PDFs.
+
+**User Roles:**
+- **Parent (default):** Can record visits, view summaries, ask questions based on vetted sources
+- **Admin:** Can upload/manage trusted PDF sources that ground all AI responses
 
 **Profile/Settings Screen Required:**
 - User-customizable avatar (generate 3 preset avatars: parent with child, stethoscope icon, heart-with-lungs icon - all in teal/green palette)
 - Display name field for personalization
 - App preferences:
+  - Reading level (SMOG index 6th-12th grade)
   - Recording quality (High/Medium for storage management)
   - Auto-save summaries (toggle)
   - Theme: Light mode only (medical context requires high clarity)
+
+### AI & Knowledge Sources
+**All AI responses must be grounded in vetted PDF sources:**
+- Admin users upload trusted medical PDFs (research papers, guidelines, educational materials)
+- PDFs are processed and stored in a vector database (backend)
+- When users ask questions, AI searches PDF content first before generating responses
+- Responses include citations to specific PDF sources
+- If no relevant information found in sources, AI states this clearly rather than hallucinating
 
 ### Navigation Structure
 **Tab Navigation (4 tabs + Floating Action Button):**
@@ -197,8 +210,35 @@
   - Reading Level: SMOG index preference (6th, 8th, 10th, 12th grade) - default 8th grade
   - Recording: Quality preference
   - Privacy: Auto-save toggle, data export button
+  - Admin (if admin role): Manage Source PDFs button - navigates to admin screen
   - About: App version, "Learn to Empower. Empower to Hope." tagline
   - Help: Tutorial replay, support email link
+
+### 8. Admin Source Management Screen (Admin Only)
+**Stack:** Pushed from Profile
+**Purpose:** Upload and manage vetted PDF sources for AI responses
+
+**Layout:**
+- Header: Default with back button
+  - Left: Back arrow
+  - Title: "Trusted Sources"
+  - Right: Add PDF button
+- Main content: FlatList of uploaded PDFs
+- Top inset: `Spacing.xl`
+- Bottom inset: `insets.bottom + Spacing.xl`
+
+**Components:**
+- Upload PDF section (at top):
+  - "Add Trusted Source" button (document-plus icon, teal)
+  - Helper text: "PDFs will be used to answer questions accurately"
+- PDF list items:
+  - PDF icon (document)
+  - Title (extracted from filename or user-provided)
+  - Upload date
+  - File size badge
+  - Status: "Processing" (amber) or "Ready" (green)
+  - Delete button (trash icon, only for admin)
+- Empty state: "No sources added yet" with upload CTA
 
 ## Visual Design Principles
 
