@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Pressable, Image, FlatList } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -13,6 +13,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
 } from "react-native-reanimated";
+import { Audio } from "expo-av";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -20,6 +21,7 @@ export default function HistoryScreen() {
   const { theme } = useTheme();
   const { visits } = useAppContext();
   const navigation = useNavigation<any>();
+  const [activeVisitId, setActiveVisitId] = useState<string | null>(null);
 
   if (visits.length === 0) {
     return (
@@ -39,6 +41,10 @@ export default function HistoryScreen() {
     );
   }
 
+  const handlePlaybackStart = (visitId: string) => {
+    setActiveVisitId(visitId);
+  };
+
   return (
     <ScreenScrollView>
       <View style={styles.container}>
@@ -47,6 +53,8 @@ export default function HistoryScreen() {
             key={visit.id}
             visit={visit}
             onPress={() => navigation.navigate("VisitDetail", { visitId: visit.id })}
+            isActive={activeVisitId === visit.id}
+            onPlaybackStart={() => handlePlaybackStart(visit.id)}
           />
         ))}
       </View>
@@ -54,9 +62,39 @@ export default function HistoryScreen() {
   );
 }
 
-function VisitCard({ visit, onPress }: { visit: Visit; onPress: () => void }) {
+function VisitCard({
+  visit,
+  onPress,
+  isActive,
+  onPlaybackStart,
+}: {
+  visit: Visit;
+  onPress: () => void;
+  isActive: boolean;
+  onPlaybackStart: () => void;
+}) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
+  const [sound, setSound] = useState<Audio.Sound | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
+  const [playbackDuration, setPlaybackDuration] = useState(0);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const soundRef = useRef<Audio.Sound | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (soundRef.current) {
+        soundRef.current.unloadAsync().catch(console.error);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isActive && sound) {
+      sound.pauseAsync().catch(console.error);
+    }
+  }, [isActive, sound]);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -67,9 +105,92 @@ function VisitCard({ visit, onPress }: { visit: Visit; onPress: () => void }) {
     return `${mins} min`;
   };
 
+  const formatTime = (millis: number) => {
+    const totalSeconds = Math.floor(millis / 1000);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+    return `${mins}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const loadSound = async (): Promise<Audio.Sound | null> => {
+    if (sound) return sound;
+
+    try {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+      });
+
+      const { sound: newSound } = await Audio.Sound.createAsync(
+        { uri: visit.audioUri },
+        { shouldPlay: false },
+        onPlaybackStatusUpdate
+      );
+
+      setSound(newSound);
+      soundRef.current = newSound;
+      return newSound;
+    } catch (error) {
+      console.error("Error loading sound:", error);
+      return null;
+    }
+  };
+
+  const onPlaybackStatusUpdate = (status: any) => {
+    if (status.isLoaded) {
+      setPlaybackPosition(status.positionMillis);
+      setPlaybackDuration(status.durationMillis || 0);
+      setIsPlaying(status.isPlaying);
+
+      if (status.didJustFinish) {
+        setIsPlaying(false);
+        setPlaybackPosition(0);
+      }
+    }
+  };
+
+  const togglePlayback = async () => {
+    if (!sound) {
+      const loadedSound = await loadSound();
+      if (!loadedSound || !isExpanded) return;
+      
+      onPlaybackStart();
+      try {
+        await loadedSound.playAsync();
+      } catch (error) {
+        console.error("Playback error after load:", error);
+      }
+      return;
+    }
+
+    try {
+      if (isPlaying) {
+        await sound.pauseAsync();
+      } else {
+        onPlaybackStart();
+        await sound.playAsync();
+      }
+    } catch (error) {
+      console.error("Playback error:", error);
+    }
+  };
+
+  const handleCardPress = async () => {
+    const willExpand = !isExpanded;
+    setIsExpanded(willExpand);
+    
+    if (willExpand && !sound) {
+      await loadSound();
+    } else if (!willExpand && sound) {
+      await sound.pauseAsync();
+    }
+  };
+
+  const progress = playbackDuration > 0 ? playbackPosition / playbackDuration : 0;
+
   return (
     <AnimatedPressable
-      onPress={onPress}
+      onPress={handleCardPress}
       onPressIn={() => {
         scale.value = withSpring(0.98);
       }}
@@ -118,18 +239,74 @@ function VisitCard({ visit, onPress }: { visit: Visit; onPress: () => void }) {
         </View>
       ) : (
         <>
-          {visit.summary && (
+          {visit.summary && !isExpanded && (
             <ThemedText style={[styles.summary, { color: theme.textSecondary }]} numberOfLines={2}>
               {visit.summary}
             </ThemedText>
           )}
-          <View style={styles.statusIndicator}>
-            <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
-            <ThemedText style={[styles.statusText, { color: theme.success }]}>
-              Summarized
-            </ThemedText>
-          </View>
+          {!isExpanded && (
+            <View style={styles.statusIndicator}>
+              <View style={[styles.statusDot, { backgroundColor: theme.success }]} />
+              <ThemedText style={[styles.statusText, { color: theme.success }]}>
+                Summarized
+              </ThemedText>
+            </View>
+          )}
         </>
+      )}
+
+      {isExpanded && (
+        <View style={styles.expandedContent}>
+          <View style={styles.audioControls}>
+            <Pressable
+              onPress={togglePlayback}
+              style={[styles.playButton, { backgroundColor: theme.primary }]}
+            >
+              <Feather name={isPlaying ? "pause" : "play"} size={20} color="white" />
+            </Pressable>
+
+            <View style={styles.progressContainer}>
+              <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+                <View
+                  style={[
+                    styles.progressFill,
+                    {
+                      backgroundColor: theme.primary,
+                      width: `${progress * 100}%`,
+                    },
+                  ]}
+                />
+              </View>
+              <View style={styles.progressTime}>
+                <ThemedText style={[styles.progressTimeText, { color: theme.textSecondary }]}>
+                  {formatTime(playbackPosition)}
+                </ThemedText>
+                <ThemedText style={[styles.progressTimeText, { color: theme.textSecondary }]}>
+                  {formatTime(playbackDuration)}
+                </ThemedText>
+              </View>
+            </View>
+          </View>
+
+          {visit.summary && (
+            <View style={styles.fullSummaryContainer}>
+              <ThemedText style={[styles.fullSummary, { color: theme.textSecondary }]}>
+                {visit.summary}
+              </ThemedText>
+            </View>
+          )}
+
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              onPress();
+            }}
+            style={[styles.viewDetailsButton, { backgroundColor: theme.primary }]}
+          >
+            <ThemedText style={styles.viewDetailsText}>View Full Details</ThemedText>
+            <Feather name="chevron-right" size={16} color="white" />
+          </Pressable>
+        </View>
       )}
     </AnimatedPressable>
   );
@@ -220,5 +397,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+  },
+  expandedContent: {
+    gap: Spacing.lg,
+    marginTop: Spacing.sm,
+  },
+  audioControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.md,
+  },
+  playButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  progressContainer: {
+    flex: 1,
+  },
+  progressBar: {
+    height: 4,
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: Spacing.xs,
+  },
+  progressFill: {
+    height: "100%",
+  },
+  progressTime: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  progressTimeText: {
+    fontSize: 12,
+  },
+  fullSummaryContainer: {
+    paddingTop: Spacing.sm,
+  },
+  fullSummary: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  viewDetailsButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  viewDetailsText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "white",
   },
 });
