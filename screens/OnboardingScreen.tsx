@@ -50,17 +50,13 @@ export default function OnboardingScreen() {
       setUserInput("");
     } else {
       setShowTransition(true);
-    }
-  };
-
-  useEffect(() => {
-    if (showTransition && !isCompleting) {
+      setIsCompleting(true);
+      
       const completeFlow = async () => {
-        setIsCompleting(true);
         try {
           await new Promise(resolve => setTimeout(resolve, 2500));
           
-          const combinedText = allResponses.join(" ");
+          const combinedText = updatedResponses.join(" ");
           const analysis = analyzeReadingLevel(combinedText);
 
           await setReadingLevel(analysis.grade);
@@ -74,7 +70,7 @@ export default function OnboardingScreen() {
       
       completeFlow();
     }
-  }, [showTransition, isCompleting, allResponses, setReadingLevel, completeOnboarding]);
+  };
 
   const wordCount = userInput.trim().split(/\s+/).filter((w) => w.length > 0).length;
   const canContinue = wordCount >= currentQuestion.minWords;
