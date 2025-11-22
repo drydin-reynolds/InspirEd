@@ -21,12 +21,6 @@ const AVATARS = [
   require("@/assets/avatars/heart-lungs.png"),
 ];
 
-const READING_LEVELS = [
-  { value: 6, label: "6th Grade" },
-  { value: 8, label: "8th Grade" },
-  { value: 10, label: "10th Grade" },
-  { value: 12, label: "12th Grade" },
-];
 
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { theme } = useTheme();
@@ -35,8 +29,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setUserName,
     selectedAvatar,
     setSelectedAvatar,
-    readingLevel,
-    setReadingLevel,
     recordingQuality,
     setRecordingQuality,
     autoSave,
@@ -75,37 +67,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
             placeholderTextColor={theme.textSecondary}
           />
         </ThemedView>
-
-        <SettingSection title="Reading Level">
-          <ThemedText style={[styles.settingDescription, { color: theme.textSecondary }]}>
-            All AI content will be adjusted to this reading level
-          </ThemedText>
-          <View style={styles.readingLevelGrid}>
-            {READING_LEVELS.map((level) => (
-              <Pressable
-                key={level.value}
-                onPress={() => setReadingLevel(level.value)}
-                style={[
-                  styles.readingLevelButton,
-                  {
-                    backgroundColor:
-                      readingLevel === level.value ? theme.primary : theme.backgroundSecondary,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  style={[
-                    styles.readingLevelText,
-                    { color: readingLevel === level.value ? "white" : theme.text },
-                  ]}
-                >
-                  {level.label}
-                </ThemedText>
-              </Pressable>
-            ))}
-          </View>
-        </SettingSection>
 
         <SettingSection title="Recording">
           <SettingToggle
@@ -240,27 +201,6 @@ const styles = StyleSheet.create({
   },
   settingTitle: {
     fontSize: 16,
-    fontWeight: "600",
-  },
-  settingDescription: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  readingLevelGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: Spacing.sm,
-  },
-  readingLevelButton: {
-    flex: 1,
-    minWidth: "45%",
-    padding: Spacing.md,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
-    alignItems: "center",
-  },
-  readingLevelText: {
-    fontSize: 14,
     fontWeight: "600",
   },
   toggleRow: {

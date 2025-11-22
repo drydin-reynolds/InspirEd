@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 export type Visit = {
   id: string;
@@ -53,13 +54,16 @@ type AppContextType = {
   selectedAvatar: number;
   setSelectedAvatar: (index: number) => void;
   readingLevel: number;
-  setReadingLevel: (level: number) => void;
+  setReadingLevel: (level: number) => Promise<void>;
   recordingQuality: "high" | "medium";
   setRecordingQuality: (quality: "high" | "medium") => void;
   autoSave: boolean;
   setAutoSave: (value: boolean) => void;
   isAdmin: boolean;
   setIsAdmin: (value: boolean) => void;
+  isLoading: boolean;
+  onboardingCompleted: boolean;
+  completeOnboarding: () => Promise<void>;
   visits: Visit[];
   addVisit: (visit: Visit) => void;
   updateVisit: (id: string, updates: Partial<Visit>) => void;
@@ -81,6 +85,11 @@ type AppContextType = {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+const STORAGE_KEYS = {
+  ONBOARDING_COMPLETED: "@InspirEd:onboardingCompleted",
+  READING_LEVEL: "@InspirEd:readingLevel",
+};
+
 export function AppProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState("Parent");
   const [selectedAvatar, setSelectedAvatar] = useState(0);
@@ -88,6 +97,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [recordingQuality, setRecordingQuality] = useState<"high" | "medium">("high");
   const [autoSave, setAutoSave] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [onboardingCompleted, setOnboardingCompleted] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [visits, setVisits] = useState<Visit[]>([]);
   const [chatMessages, setChatMessages] = useState<{ [visitId: string]: Message[] }>({});
   const [plannerQuestions, setPlannerQuestions] = useState<Question[]>([]);
@@ -219,6 +230,51 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEducationChatMessages((prev) => [...prev, message]);
   };
 
+  const completeOnboarding = async () => {
+    setOnboardingCompleted(true);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, "true");
+    } catch (error) {
+      console.error("Error saving onboarding completion:", error);
+      throw error;
+    }
+  };
+
+  const updateReadingLevel = async (level: number) => {
+    setReadingLevel(level);
+    try {
+      await AsyncStorage.setItem(STORAGE_KEYS.READING_LEVEL, level.toString());
+    } catch (error) {
+      console.error("Error saving reading level:", error);
+      throw error;
+    }
+  };
+
+  useEffect(() => {
+    const loadStoredData = async () => {
+      try {
+        const [storedOnboarding, storedLevel] = await Promise.all([
+          AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED),
+          AsyncStorage.getItem(STORAGE_KEYS.READING_LEVEL),
+        ]);
+
+        if (storedOnboarding === "true") {
+          setOnboardingCompleted(true);
+        }
+
+        if (storedLevel) {
+          setReadingLevel(parseInt(storedLevel, 10));
+        }
+      } catch (error) {
+        console.error("Error loading stored data:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadStoredData();
+  }, []);
+
   return (
     <AppContext.Provider
       value={{
@@ -227,13 +283,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
         selectedAvatar,
         setSelectedAvatar,
         readingLevel,
-        setReadingLevel,
+        setReadingLevel: updateReadingLevel,
         recordingQuality,
         setRecordingQuality,
         autoSave,
         setAutoSave,
         isAdmin,
         setIsAdmin,
+        isLoading,
+        onboardingCompleted,
+        completeOnboarding,
         visits,
         addVisit,
         updateVisit,
