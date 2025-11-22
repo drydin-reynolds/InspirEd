@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { StyleSheet, View, TextInput, Platform } from "react-native";
+import React, { useState, useEffect } from "react";
+import { StyleSheet, View, TextInput, Platform, ActivityIndicator } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ThemedText } from "@/components/ThemedText";
@@ -18,6 +18,7 @@ export default function OnboardingScreen() {
   const [step, setStep] = useState(0);
   const [allResponses, setAllResponses] = useState<string[]>([]);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [showTransition, setShowTransition] = useState(false);
 
   const questions = [
     {
@@ -48,19 +49,32 @@ export default function OnboardingScreen() {
       setStep(step + 1);
       setUserInput("");
     } else {
-      setIsCompleting(true);
-      try {
-        const combinedText = updatedResponses.join(" ");
-        const analysis = analyzeReadingLevel(combinedText);
-
-        await setReadingLevel(analysis.grade);
-        await completeOnboarding();
-      } catch (error) {
-        console.error("Error completing onboarding:", error);
-        setIsCompleting(false);
-      }
+      setShowTransition(true);
     }
   };
+
+  useEffect(() => {
+    if (showTransition && !isCompleting) {
+      const completeFlow = async () => {
+        setIsCompleting(true);
+        try {
+          await new Promise(resolve => setTimeout(resolve, 2500));
+          
+          const combinedText = allResponses.join(" ");
+          const analysis = analyzeReadingLevel(combinedText);
+
+          await setReadingLevel(analysis.grade);
+          await completeOnboarding();
+        } catch (error) {
+          console.error("Error completing onboarding:", error);
+          setIsCompleting(false);
+          setShowTransition(false);
+        }
+      };
+      
+      completeFlow();
+    }
+  }, [showTransition, isCompleting, allResponses, setReadingLevel, completeOnboarding]);
 
   const wordCount = userInput.trim().split(/\s+/).filter((w) => w.length > 0).length;
   const canContinue = wordCount >= currentQuestion.minWords;
@@ -78,6 +92,22 @@ export default function OnboardingScreen() {
   };
 
   const ScrollComponent = Platform.OS === "web" ? require("react-native").ScrollView : KeyboardAwareScrollView;
+
+  if (showTransition) {
+    return (
+      <ThemedView style={styles.transitionContainer}>
+        <ActivityIndicator size="large" color={theme.primary} style={styles.spinner} />
+        
+        <ThemedText style={styles.transitionTitle}>
+          Personalizing Your Experience
+        </ThemedText>
+        
+        <ThemedText style={[styles.transitionDescription, { color: theme.textSecondary }]}>
+          We're analyzing your responses to tailor InspirEd to your needs...
+        </ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ScrollComponent {...scrollViewProps}>
@@ -143,6 +173,26 @@ const styles = StyleSheet.create({
   container: {
     padding: Spacing.xl,
     gap: Spacing.xl,
+  },
+  transitionContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: Spacing.xl,
+  },
+  spinner: {
+    marginBottom: Spacing.xl,
+  },
+  transitionTitle: {
+    fontSize: 24,
+    fontWeight: "700",
+    textAlign: "center",
+    marginBottom: Spacing.md,
+  },
+  transitionDescription: {
+    fontSize: 16,
+    textAlign: "center",
+    lineHeight: 24,
   },
   header: {
     alignItems: "center",
