@@ -51,8 +51,6 @@ export type LearningModule = {
 type AppContextType = {
   userName: string;
   setUserName: (name: string) => void;
-  selectedAvatar: number;
-  setSelectedAvatar: (index: number) => void;
   readingLevel: number;
   setReadingLevel: (level: number) => Promise<void>;
   recordingQuality: "high" | "medium";
@@ -92,7 +90,6 @@ const STORAGE_KEYS = {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState("Parent");
-  const [selectedAvatar, setSelectedAvatar] = useState(0);
   const [readingLevel, setReadingLevel] = useState(8);
   const [recordingQuality, setRecordingQuality] = useState<"high" | "medium">("high");
   const [autoSave, setAutoSave] = useState(true);
@@ -280,8 +277,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       value={{
         userName,
         setUserName,
-        selectedAvatar,
-        setSelectedAvatar,
         readingLevel,
         setReadingLevel: updateReadingLevel,
         recordingQuality,

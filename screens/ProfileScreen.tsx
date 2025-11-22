@@ -1,5 +1,5 @@
 import React from "react";
-import { StyleSheet, View, TextInput, Pressable, Image } from "react-native";
+import { StyleSheet, View, TextInput, Pressable } from "react-native";
 import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { ThemedText } from "@/components/ThemedText";
@@ -15,20 +15,11 @@ type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, "Profile">;
 };
 
-const AVATARS = [
-  require("@/assets/avatars/parent-child.png"),
-  require("@/assets/avatars/stethoscope.png"),
-  require("@/assets/avatars/heart-lungs.png"),
-];
-
-
 export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   const { theme } = useTheme();
   const {
     userName,
     setUserName,
-    selectedAvatar,
-    setSelectedAvatar,
     recordingQuality,
     setRecordingQuality,
     autoSave,
@@ -40,24 +31,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
   return (
     <ScreenKeyboardAwareScrollView>
       <View style={styles.container}>
-        <View style={styles.avatarSection}>
-          {AVATARS.map((avatar, index) => (
-            <Pressable
-              key={index}
-              onPress={() => setSelectedAvatar(index)}
-              style={[
-                styles.avatarContainer,
-                selectedAvatar === index && {
-                  borderColor: theme.primary,
-                  borderWidth: 3,
-                },
-              ]}
-            >
-              <Image source={avatar} style={styles.avatar} resizeMode="contain" />
-            </Pressable>
-          ))}
-        </View>
-
         <ThemedView style={[styles.inputCard, { backgroundColor: theme.backgroundSecondary }]}>
           <TextInput
             style={[styles.nameInput, { color: theme.text }]}
@@ -168,24 +141,6 @@ const styles = StyleSheet.create({
   container: {
     padding: Spacing.lg,
     gap: Spacing.xl,
-  },
-  avatarSection: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: Spacing.lg,
-    marginVertical: Spacing.lg,
-  },
-  avatarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    overflow: "hidden",
-    borderWidth: 2,
-    borderColor: "transparent",
-  },
-  avatar: {
-    width: "100%",
-    height: "100%",
   },
   inputCard: {
     borderRadius: BorderRadius.md,
