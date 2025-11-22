@@ -110,8 +110,8 @@ export default function OnboardingScreen() {
           />
 
           <View style={styles.footer}>
-            <ThemedText style={[styles.wordCount, { color: theme.textSecondary }]}>
-              {wordCount} / {currentQuestion.minWords} words
+            <ThemedText style={[styles.wordCount, { color: canContinue ? theme.primary : theme.textSecondary }]}>
+              {wordCount} words (minimum {currentQuestion.minWords})
             </ThemedText>
           </View>
         </ThemedView>
