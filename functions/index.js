@@ -48,7 +48,7 @@ function getReadingLevelGuidance(readingLevel) {
 
 exports.transcribeAndSummarize = onRequest(
   {
-    cors: ["https://*.replit.dev", "https://*.replit.app"],
+    cors: true,
     maxInstances: 10,
     timeoutSeconds: 300,
     memory: "512MiB",
@@ -174,7 +174,7 @@ Important:
 
 exports.answerQuestion = onRequest(
   {
-    cors: ["https://*.replit.dev", "https://*.replit.app"],
+    cors: true,
     maxInstances: 10,
     timeoutSeconds: 60,
     memory: "256MiB",
@@ -244,7 +244,7 @@ Please answer the question based on the visit notes above. If the information is
 
 exports.suggestQuestions = onRequest(
   {
-    cors: ["https://*.replit.dev", "https://*.replit.app"],
+    cors: true,
     maxInstances: 10,
     timeoutSeconds: 60,
     memory: "256MiB",

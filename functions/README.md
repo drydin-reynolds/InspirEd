@@ -62,12 +62,14 @@ https://suggestquestions-XXXXXXX.cloudfunctions.net
 
 ### 7. Update App Configuration
 
-Copy the `transcribeAndSummarize` function URL and add it to your Replit secrets:
+Copy the base Cloud Function URL and add it to your Replit secrets:
 
 1. In Replit, go to Secrets (padlock icon)
 2. Add a new secret:
-   - Key: `EXPO_PUBLIC_CLOUD_FUNCTION_URL`
-   - Value: `https://transcribeandsummarize-XXXXXXX.cloudfunctions.net`
+   - Key: `EXPO_PUBLIC_CLOUD_FUNCTION_BASE_URL`
+   - Value: `https://us-central1-capstone-87b51.cloudfunctions.net` (use your actual base URL from step 6, WITHOUT the function name)
+
+**Note:** Use only the base URL (e.g., `https://us-central1-capstone-87b51.cloudfunctions.net`), not the full function URL. The app will append function names like `/transcribeAndSummarize`.
 
 ## Functions Overview
 

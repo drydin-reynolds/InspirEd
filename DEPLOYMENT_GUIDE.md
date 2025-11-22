@@ -191,8 +191,8 @@ https://console.firebase.google.com/project/capstone-87b51/functions/logs
 ⚠️ **TESTING ONLY:** This setup is for development and testing. See `functions/SECURITY.md` for production requirements.
 
 ✅ **API Key Protection:** Your Gemini API key stays on the server - never exposed to clients  
-✅ **CORS Restrictions:** Functions only accept requests from Replit domains  
 ✅ **Request Validation:** Size limits and error codes protect against basic abuse  
+⚠️ **CORS Open:** Functions accept requests from any origin (testing only)  
 ❌ **No Authentication:** Anyone with the Cloud Function URL can call endpoints (add Firebase Auth for production)  
 
 **For production deployment with real patient data, you MUST implement additional security measures outlined in `functions/SECURITY.md`.**

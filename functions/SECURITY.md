@@ -6,7 +6,7 @@
 
 ### What's Implemented
 
-✅ **CORS Restrictions:** Functions only accept requests from `*.replit.dev` and `*.replit.app` domains
+✅ **CORS Enabled:** Functions accept requests from any origin (testing only - lock down for production)
 ✅ **Request Size Limits:** 50MB maximum to prevent abuse
 ✅ **Error Correlation IDs:** For debugging without exposing sensitive details
 ✅ **Structured Error Codes:** Client can handle specific error types gracefully
