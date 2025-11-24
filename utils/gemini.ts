@@ -6,6 +6,12 @@ const CLOUD_FUNCTION_BASE_URL =
   (typeof process !== "undefined" && process.env?.EXPO_PUBLIC_CLOUD_FUNCTION_BASE_URL) ||
   "";
 
+console.log("Environment check:", {
+  fromExpoConfig: Constants.expoConfig?.extra?.CLOUD_FUNCTION_BASE_URL,
+  fromProcessEnv: typeof process !== "undefined" ? process.env?.EXPO_PUBLIC_CLOUD_FUNCTION_BASE_URL : "process undefined",
+  final: CLOUD_FUNCTION_BASE_URL,
+});
+
 if (!CLOUD_FUNCTION_BASE_URL) {
   console.warn(
     "CLOUD_FUNCTION_BASE_URL not found. AI features will not work. Please deploy Cloud Functions and set EXPO_PUBLIC_CLOUD_FUNCTION_BASE_URL."
