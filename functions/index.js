@@ -86,7 +86,7 @@ exports.transcribeAndSummarize = onRequest(
         });
       }
 
-      const modelName = "gemini-1.5-flash";
+      const modelName = "gemini-2.0-flash-001";
       console.log(`[${correlationId}] Using Gemini model: ${modelName}`);
       const model = genAI.getGenerativeModel({ model: modelName });
       const readingGuidance = getReadingLevelGuidance(readingLevel);
@@ -206,7 +206,9 @@ exports.answerQuestion = onRequest(
         });
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const modelName = "gemini-2.0-flash-001";
+      console.log(`[${correlationId}] Using Gemini model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
       const readingGuidance = getReadingLevelGuidance(readingLevel);
 
       const prompt = `You are a medical assistant helping parents understand their child's doctor visit.
@@ -287,7 +289,9 @@ exports.suggestQuestions = onRequest(
         });
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const modelName = "gemini-2.0-flash-001";
+      console.log(`[${correlationId}] Using Gemini model: ${modelName}`);
+      const model = genAI.getGenerativeModel({ model: modelName });
       const recentVisits = visitHistory
         .slice(0, 3)
         .map((v) => v.summary || "No summary")
