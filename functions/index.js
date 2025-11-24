@@ -86,7 +86,7 @@ exports.transcribeAndSummarize = onRequest(
         });
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const readingGuidance = getReadingLevelGuidance(readingLevel);
 
       const prompt = `You are a medical visit assistant helping parents of children with chronic pulmonary conditions.
@@ -204,7 +204,7 @@ exports.answerQuestion = onRequest(
         });
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const readingGuidance = getReadingLevelGuidance(readingLevel);
 
       const prompt = `You are a medical assistant helping parents understand their child's doctor visit.
@@ -285,7 +285,7 @@ exports.suggestQuestions = onRequest(
         });
       }
 
-      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash-exp" });
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const recentVisits = visitHistory
         .slice(0, 3)
         .map((v) => v.summary || "No summary")
