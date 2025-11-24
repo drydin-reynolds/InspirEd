@@ -21,13 +21,20 @@ export async function generateVisitSummary(
       throw new Error("Cloud Function URL not configured");
     }
 
+    console.log("Cloud Function URL:", CLOUD_FUNCTION_BASE_URL);
+    console.log("Reading audio file from:", audioUri);
+
     const audioData = await FileSystem.readAsStringAsync(audioUri, {
       encoding: "base64",
     });
 
+    console.log("Audio data length:", audioData.length);
+
     const mimeType = audioUri.toLowerCase().endsWith(".m4a")
       ? "audio/mp4"
       : "audio/mpeg";
+
+    console.log("Sending request to Cloud Function with mimeType:", mimeType);
 
     const response = await fetch(`${CLOUD_FUNCTION_BASE_URL}/transcribeAndSummarize`, {
       method: "POST",
@@ -41,12 +48,22 @@ export async function generateVisitSummary(
       }),
     });
 
+    console.log("Cloud Function response status:", response.status);
+
     if (!response.ok) {
-      const errorData = await response.json();
+      const errorText = await response.text();
+      console.error("Cloud Function error response:", errorText);
+      let errorData;
+      try {
+        errorData = JSON.parse(errorText);
+      } catch {
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
       throw new Error(errorData.error || "Failed to process audio");
     }
 
     const result = await response.json();
+    console.log("Cloud Function success! Transcript length:", result.transcript?.length || 0);
 
     return {
       transcript: result.transcript || "",
