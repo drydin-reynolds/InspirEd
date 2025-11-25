@@ -17,9 +17,8 @@ SplashScreen.preventAutoHideAsync();
 
 function AppContent() {
   const navigationRef = useRef<NavigationContainerRef<any>>(null);
-  const { isLoading, onboardingCompleted, completeOnboarding } = useAppContext();
+  const { isLoading, onboardingCompleted } = useAppContext();
   const prevStateRef = useRef({ isLoading, onboardingCompleted });
-  const hasInitializedRef = useRef(false);
 
   useEffect(() => {
     const prevState = prevStateRef.current;
@@ -32,16 +31,7 @@ function AppContent() {
       
       if (isLoading) {
         routeName = "Loading";
-      } else if (!hasInitializedRef.current) {
-        // First load: skip onboarding for testing, go straight to Main
-        hasInitializedRef.current = true;
-        routeName = "Main";
-        // Mark as completed so "Redo Setup" can properly reset it
-        if (!onboardingCompleted) {
-          completeOnboarding();
-        }
-      } else if (prevState.onboardingCompleted && !onboardingCompleted) {
-        // User clicked "Redo Setup" - go to Onboarding
+      } else if (!onboardingCompleted) {
         routeName = "Onboarding";
       } else {
         routeName = "Main";
@@ -54,7 +44,7 @@ function AppContent() {
 
       prevStateRef.current = { isLoading, onboardingCompleted };
     }
-  }, [isLoading, onboardingCompleted, completeOnboarding]);
+  }, [isLoading, onboardingCompleted]);
 
   return (
     <NavigationContainer ref={navigationRef}>
