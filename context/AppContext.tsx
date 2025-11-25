@@ -63,6 +63,7 @@ type AppContextType = {
   isLoading: boolean;
   onboardingCompleted: boolean;
   completeOnboarding: () => Promise<void>;
+  resetOnboarding: () => Promise<void>;
   visits: Visit[];
   addVisit: (visit: Visit) => void;
   updateVisit: (id: string, updates: Partial<Visit>) => void;
@@ -355,6 +356,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const resetOnboarding = async () => {
+    setOnboardingCompleted(false);
+    try {
+      await AsyncStorage.removeItem(STORAGE_KEYS.ONBOARDING_COMPLETED);
+    } catch (error) {
+      console.error("Error resetting onboarding:", error);
+      throw error;
+    }
+  };
+
   const updateReadingLevel = async (level: number) => {
     setReadingLevel(level);
     try {
@@ -436,6 +447,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         isLoading,
         onboardingCompleted,
         completeOnboarding,
+        resetOnboarding,
         visits,
         addVisit,
         updateVisit,

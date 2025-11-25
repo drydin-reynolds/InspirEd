@@ -26,7 +26,16 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setAutoSave,
     isAdmin,
     setIsAdmin,
+    readingLevel,
+    resetOnboarding,
   } = useAppContext();
+
+  const getReadingLevelLabel = (level: number): string => {
+    if (level <= 6) return "Simple (6th grade)";
+    if (level <= 8) return "Standard (8th grade)";
+    if (level <= 10) return "Detailed (10th grade)";
+    return "Advanced (12th grade)";
+  };
 
   return (
     <ScreenKeyboardAwareScrollView>
@@ -51,6 +60,26 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
         <SettingSection title="Privacy">
           <SettingToggle label="Auto-save summaries" value={autoSave} onValueChange={setAutoSave} />
+        </SettingSection>
+
+        <SettingSection title="Personalization">
+          <View style={styles.readingLevelRow}>
+            <View>
+              <ThemedText>Reading Level</ThemedText>
+              <ThemedText style={[styles.readingLevelValue, { color: theme.textSecondary }]}>
+                {getReadingLevelLabel(readingLevel)}
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={resetOnboarding}
+              style={[styles.redoButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+            >
+              <Icon name="refresh" size={16} color={theme.primary} />
+              <ThemedText style={[styles.redoButtonText, { color: theme.primary }]}>
+                Redo Setup
+              </ThemedText>
+            </Pressable>
+          </View>
         </SettingSection>
 
         {isAdmin && (
@@ -175,6 +204,28 @@ const styles = StyleSheet.create({
     width: 22,
     height: 22,
     borderRadius: 11,
+  },
+  readingLevelRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  readingLevelValue: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  redoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+  },
+  redoButtonText: {
+    fontSize: 14,
+    fontWeight: "500",
   },
   adminToggle: {
     alignItems: "center",
