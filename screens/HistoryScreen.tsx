@@ -19,7 +19,7 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function HistoryScreen() {
   const { theme } = useTheme();
-  const { visits, deleteVisit } = useAppContext();
+  const { visits, deleteVisit, loadSampleVisits } = useAppContext();
   const navigation = useNavigation<any>();
   const [activeVisitId, setActiveVisitId] = useState<string | null>(null);
 
@@ -59,6 +59,15 @@ export default function HistoryScreen() {
           <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
             Tap the microphone button to record your first doctor visit.
           </ThemedText>
+          <Pressable
+            onPress={loadSampleVisits}
+            style={[styles.loadSampleButton, { backgroundColor: theme.backgroundSecondary, borderColor: theme.border }]}
+          >
+            <Icon name="document" size={18} color={theme.primary} />
+            <ThemedText style={[styles.loadSampleText, { color: theme.primary }]}>
+              Load Sample Visits
+            </ThemedText>
+          </Pressable>
         </View>
       </ScreenScrollView>
     );
@@ -434,6 +443,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
     lineHeight: 24,
+  },
+  loadSampleButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    marginTop: Spacing.md,
+  },
+  loadSampleText: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   expandedContent: {
     gap: Spacing.lg,

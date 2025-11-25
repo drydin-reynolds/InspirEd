@@ -67,6 +67,7 @@ type AppContextType = {
   addVisit: (visit: Visit) => void;
   updateVisit: (id: string, updates: Partial<Visit>) => void;
   deleteVisit: (id: string) => void;
+  loadSampleVisits: () => void;
   chatMessages: { [visitId: string]: Message[] };
   addChatMessage: (visitId: string, message: Message) => void;
   plannerQuestions: Question[];
@@ -212,6 +213,67 @@ export function AppProvider({ children }: { children: ReactNode }) {
       );
       return rest;
     });
+  };
+
+  const loadSampleVisits = () => {
+    const sampleVisits: Visit[] = [
+      {
+        id: "sample-1",
+        date: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        doctorName: "Smith",
+        duration: 1245,
+        audioUri: "",
+        transcription: "Doctor: Good morning! How has Emma been doing since our last visit? Parent: She's been doing much better with her breathing exercises. We've been using the spacer with her inhaler twice daily as you recommended. Doctor: That's great to hear. Let me listen to her lungs... Her airways sound much clearer today. I'm pleased with her progress. Parent: We did notice she had some wheezing last week during the cold snap. Doctor: That's common with temperature changes. Let's discuss some strategies to manage that.",
+        summary: "Emma is making good progress with her breathing exercises and inhaler use. Her lungs sound clearer. Some wheezing occurred during cold weather, which is normal. The doctor will provide strategies for managing symptoms during temperature changes.",
+        keyPoints: [
+          "Breathing exercises are helping",
+          "Continue spacer with inhaler twice daily",
+          "Lungs sound clearer than before",
+          "Cold weather can trigger wheezing",
+        ],
+        diagnoses: ["Pediatric asthma - well controlled"],
+        actions: [
+          "Continue current medication routine",
+          "Use rescue inhaler before outdoor activities in cold weather",
+          "Follow up in 3 months",
+        ],
+        medicalTerms: [
+          { term: "Spacer", explanation: "A tube that attaches to an inhaler to help deliver medicine more effectively to the lungs" },
+          { term: "Wheezing", explanation: "A whistling sound when breathing, often caused by narrowed airways" },
+        ],
+        isProcessing: false,
+      },
+      {
+        id: "sample-2",
+        date: new Date(Date.now() - 14 * 24 * 60 * 60 * 1000),
+        doctorName: "Johnson",
+        duration: 1820,
+        audioUri: "",
+        transcription: "Doctor: I've reviewed Emma's latest pulmonary function test results. Parent: How did she do? Doctor: Her FEV1 is at 85% of predicted, which is an improvement from 78% last time. This is really encouraging. Parent: That's wonderful news! We've been very consistent with her treatments. Doctor: It shows. I'd like to discuss adjusting her maintenance medication since she's doing so well.",
+        summary: "Emma's lung function test shows improvement - FEV1 increased from 78% to 85%. The consistent treatment routine is working well. The doctor may adjust maintenance medications based on this progress.",
+        keyPoints: [
+          "FEV1 improved from 78% to 85%",
+          "Pulmonary function test shows positive trend",
+          "Consistent treatment is paying off",
+          "May reduce maintenance medication",
+        ],
+        diagnoses: ["Pediatric asthma - improving"],
+        actions: [
+          "Discuss medication adjustment at next visit",
+          "Continue current routine until then",
+          "Schedule follow-up pulmonary function test in 6 months",
+        ],
+        medicalTerms: [
+          { term: "FEV1", explanation: "Forced Expiratory Volume in 1 second - measures how much air you can forcefully breathe out in one second" },
+          { term: "Pulmonary function test", explanation: "A breathing test that measures how well the lungs are working" },
+        ],
+        isProcessing: false,
+      },
+    ];
+    setVisits(sampleVisits);
+    AsyncStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(sampleVisits)).catch((error) =>
+      console.error("Error saving sample visits:", error)
+    );
   };
 
   const addChatMessage = (visitId: string, message: Message) => {
@@ -378,6 +440,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         addVisit,
         updateVisit,
         deleteVisit,
+        loadSampleVisits,
         chatMessages,
         addChatMessage,
         plannerQuestions,
