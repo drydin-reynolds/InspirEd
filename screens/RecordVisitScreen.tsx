@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Pressable, TextInput, Alert, ScrollView, ActivityIndicator } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, Alert } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Feather } from "@expo/vector-icons";
@@ -15,7 +15,7 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { generateVisitSummary } from "@/utils/gemini";
+import { generateVisitSummary } from "@/utils/openai";
 import { Audio } from "expo-av";
 
 /*
@@ -52,10 +52,6 @@ export default function RecordVisitScreen() {
   const [playbackPosition, setPlaybackPosition] = useState(0);
   const [playbackDuration, setPlaybackDuration] = useState(0);
   const [recordedUri, setRecordedUri] = useState<string | null>(null);
-  
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [processingComplete, setProcessingComplete] = useState(false);
-  const [visitSummary, setVisitSummary] = useState<any>(null);
   
   const recordingRef = useRef<Audio.Recording | null>(null);
   const soundRef = useRef<Audio.Sound | null>(null);
@@ -136,11 +132,6 @@ export default function RecordVisitScreen() {
   };
 
   const handleCancel = async () => {
-    if (processingComplete) {
-      navigation.goBack();
-      return;
-    }
-    
     if (isRecording || seconds > 0) {
       Alert.alert(
         "Cancel Recording?",
@@ -330,22 +321,17 @@ export default function RecordVisitScreen() {
       };
       
       addVisit(visit);
-      setIsProcessing(true);
-      setReviewMode(false);
+      navigation.goBack();
       
-      const summary = await generateVisitSummary(recordedUri, readingLevel);
-      
-      updateVisit(visitId, {
-        ...summary,
-        isProcessing: false,
-      });
-      
-      setVisitSummary(summary);
-      setIsProcessing(false);
-      setProcessingComplete(true);
+      setTimeout(async () => {
+        const summary = await generateVisitSummary("Mock transcript", readingLevel);
+        updateVisit(visitId, {
+          ...summary,
+          isProcessing: false,
+        });
+      }, 3000);
     } catch (error) {
       console.error("Failed to save visit:", error);
-      setIsProcessing(false);
       Alert.alert("Error", "Could not save the visit. Please try again.");
     }
   };
@@ -363,64 +349,15 @@ export default function RecordVisitScreen() {
     <View style={[styles.container, { backgroundColor: theme.primary }]}>
       <View style={[styles.header, { paddingTop: insets.top + Spacing.md }]}>
         <Pressable onPress={handleCancel} style={styles.headerButton}>
-          <ThemedText style={styles.headerButtonText}>
-            {processingComplete ? "Close" : "Cancel"}
-          </ThemedText>
+          <ThemedText style={styles.headerButtonText}>Cancel</ThemedText>
         </Pressable>
         <ThemedText style={styles.headerTitle}>
-          {processingComplete ? "Visit Saved!" : reviewMode ? "Review Recording" : isProcessing ? "Processing..." : "Recording Visit"}
+          {reviewMode ? "Review Recording" : "Recording Visit"}
         </ThemedText>
         <View style={styles.headerButton} />
       </View>
 
-      {isProcessing ? (
-        <View style={styles.content}>
-          <View style={styles.waveformContainer}>
-            <View
-              style={[
-                styles.waveform,
-                { backgroundColor: theme.accent },
-              ]}
-            >
-              <ActivityIndicator size="large" color="white" />
-            </View>
-          </View>
-          <ThemedText style={styles.timer}>Processing transcription...</ThemedText>
-          <ThemedText style={styles.instructionText}>
-            This may take a few moments. We're using AI to transcribe your recording and create a summary.
-          </ThemedText>
-        </View>
-      ) : processingComplete && visitSummary ? (
-        <View style={styles.content}>
-          <View style={styles.waveformContainer}>
-            <View
-              style={[
-                styles.waveform,
-                { backgroundColor: theme.accent },
-              ]}
-            >
-              <Feather
-                name="check-circle"
-                size={48}
-                color="white"
-              />
-            </View>
-          </View>
-          <ThemedText style={styles.timer}>Transcription Complete!</ThemedText>
-          <ThemedText style={styles.summaryLabel}>Summary:</ThemedText>
-          <ScrollView style={styles.summaryContainer} showsVerticalScrollIndicator={false}>
-            <ThemedText style={styles.summaryText}>{visitSummary.summary}</ThemedText>
-          </ScrollView>
-          <Pressable
-            onPress={() => navigation.goBack()}
-            style={[styles.doneButton, { backgroundColor: "white" }]}
-          >
-            <ThemedText style={[styles.doneButtonText, { color: theme.primary }]}>
-              Done
-            </ThemedText>
-          </Pressable>
-        </View>
-      ) : reviewMode ? (
+      {reviewMode ? (
         <View style={styles.content}>
           <View style={styles.waveformContainer}>
             <View
@@ -689,41 +626,5 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "white",
-  },
-  instructionText: {
-    fontSize: 16,
-    color: "rgba(255,255,255,0.8)",
-    textAlign: "center",
-    paddingHorizontal: Spacing.xl,
-    marginTop: Spacing.lg,
-  },
-  summaryLabel: {
-    fontSize: 18,
-    fontWeight: "600",
-    color: "white",
-    marginBottom: Spacing.md,
-    alignSelf: "flex-start",
-  },
-  summaryContainer: {
-    width: "100%",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: BorderRadius.md,
-    padding: Spacing.lg,
-    marginBottom: Spacing["2xl"],
-    maxHeight: 300,
-  },
-  summaryText: {
-    fontSize: 16,
-    color: "white",
-    lineHeight: 24,
-  },
-  doneButton: {
-    paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing["3xl"],
-    borderRadius: BorderRadius.md,
-  },
-  doneButtonText: {
-    fontSize: 18,
-    fontWeight: "600",
   },
 });

@@ -8,7 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Question } from "@/context/AppContext";
-import { suggestPlannerQuestions } from "@/utils/gemini";
+import { suggestPlannerQuestions } from "@/utils/openai";
 
 export default function PlannerScreen() {
   const { theme } = useTheme();

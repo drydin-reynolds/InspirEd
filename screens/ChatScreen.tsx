@@ -8,7 +8,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Message } from "@/context/AppContext";
 import { useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { askQuestionAboutVisit } from "@/utils/gemini";
+import { askQuestionAboutVisit } from "@/utils/openai";
 
 export default function ChatScreen() {
   const { theme } = useTheme();

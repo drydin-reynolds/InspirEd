@@ -311,53 +311,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
             date: new Date(visit.date),
           }));
           setVisits(visitsWithDates);
-        } else {
-          const sampleVisit: Visit = {
-            id: "sample-visit-1",
-            date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-            doctorName: "Dr. Sarah Chen",
-            duration: 1847,
-            audioUri: "",
-            summary: `Your child was seen today for a follow-up visit about their asthma. Dr. Chen listened to their lungs and said they sound much better since starting the new inhaler. The peak flow meter readings have improved from 180 to 240, which is a good sign. The doctor recommended continuing the current medications: using the blue rescue inhaler only when needed for symptoms, and the orange controller inhaler twice daily every morning and evening. You should watch for signs of worsening like increased coughing at night, difficulty keeping up with friends during play, or needing the rescue inhaler more than twice a week. If any of these happen, call the office right away. The doctor also mentioned that the slight wheeze heard during the exam is normal and should improve with consistent use of the controller medication. Next appointment is scheduled in 3 months unless symptoms worsen.`,
-            keyPoints: [
-              "Lungs sound improved since last visit",
-              "Peak flow readings increased from 180 to 240",
-              "Continue current medication schedule",
-              "Watch for nighttime coughing or increased rescue inhaler use",
-              "Slight wheeze is normal and should improve",
-            ],
-            diagnoses: [
-              "Persistent asthma, improving",
-              "Mild bronchial inflammation",
-            ],
-            actions: [
-              "Continue blue rescue inhaler as needed for symptoms",
-              "Use orange controller inhaler twice daily (morning and evening)",
-              "Monitor peak flow readings at home",
-              "Call office if rescue inhaler needed more than twice weekly",
-              "Return for follow-up in 3 months",
-            ],
-            medicalTerms: [
-              {
-                term: "Peak flow meter",
-                explanation: "A small device that measures how fast air comes out of the lungs when you breathe out hard. Higher numbers mean the airways are more open.",
-              },
-              {
-                term: "Controller inhaler",
-                explanation: "Medicine taken every day to prevent asthma symptoms and keep airways from getting swollen. Works over time, not for quick relief.",
-              },
-              {
-                term: "Rescue inhaler",
-                explanation: "Fast-acting medicine used when breathing gets hard or wheezing starts. Opens airways quickly to help breathing within minutes.",
-              },
-              {
-                term: "Wheeze",
-                explanation: "A whistling sound when breathing caused by narrowed airways. Common in asthma and usually gets better with treatment.",
-              },
-            ],
-            isProcessing: false,
-          };
-          setVisits([sampleVisit]);
         }
 
         if (storedChatMessages) {
