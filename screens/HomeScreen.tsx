@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, Pressable } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext } from "@/context/AppContext";
@@ -66,7 +66,7 @@ export default function HomeScreen() {
           {lastVisit ? (
             <>
               <ActionButton
-                icon="document-text"
+                icon="document"
                 title="Recent Visit"
                 subtitle={new Date(lastVisit.date).toLocaleDateString()}
                 onPress={() => navigation.navigate("HistoryTab")}
@@ -74,13 +74,13 @@ export default function HomeScreen() {
 
               <View style={styles.statsContainer}>
                 <StatCard
-                  icon="time-outline"
+                  icon="time"
                   value={totalVisits.toString()}
                   label="Total Visits"
                   theme={theme}
                 />
                 <StatCard
-                  icon="help-circle-outline"
+                  icon="help"
                   value={totalQuestions.toString()}
                   label="Questions Asked"
                   theme={theme}
@@ -88,7 +88,7 @@ export default function HomeScreen() {
               </View>
 
               <ActionButton
-                icon="chatbubble"
+                icon="chat"
                 title="Ask a Question"
                 subtitle="Get answers about your visits"
                 onPress={() => {
@@ -124,7 +124,7 @@ function StatCard({
   label,
   theme,
 }: {
-  icon: string;
+  icon: "time" | "help";
   value: string;
   label: string;
   theme: any;
@@ -139,7 +139,7 @@ function StatCard({
         },
       ]}
     >
-      <Ionicons name={icon as any} size={24} color={theme.primary} />
+      <Icon name={icon} size={24} color={theme.primary} />
       <ThemedText style={styles.statValue}>{value}</ThemedText>
       <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
         {label}
@@ -154,7 +154,7 @@ function ActionButton({
   subtitle,
   onPress,
 }: {
-  icon: string;
+  icon: "document" | "chat" | "calendar";
   title: string;
   subtitle: string;
   onPress: () => void;
@@ -184,14 +184,14 @@ function ActionButton({
         },
       ]}
     >
-      <Ionicons name={icon as any} size={24} color={theme.primary} />
+      <Icon name={icon} size={24} color={theme.primary} />
       <View style={styles.actionTextContainer}>
         <ThemedText style={styles.actionTitle}>{title}</ThemedText>
         <ThemedText style={[styles.actionSubtitle, { color: theme.textSecondary }]}>
           {subtitle}
         </ThemedText>
       </View>
-      <Ionicons name="chevron-forward" size={20} color={theme.textSecondary} />
+      <Icon name="chevron-right" size={20} color={theme.textSecondary} />
     </AnimatedPressable>
   );
 }

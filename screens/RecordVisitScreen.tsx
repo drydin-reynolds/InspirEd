@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Pressable, TextInput, Alert, ScrollView, ActivityIndicator, Platform } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext } from "@/context/AppContext";
@@ -439,7 +439,7 @@ export default function RecordVisitScreen() {
           ) : (
             <View style={styles.resultsContainer}>
               <View style={styles.resultHeader}>
-                <Ionicons name="checkmark-circle" size={48} color="white" />
+                <Icon name="checkmark-circle" size={48} color="white" />
                 <ThemedText style={styles.resultsTitle}>Visit Processed Successfully</ThemedText>
               </View>
 
@@ -483,7 +483,7 @@ export default function RecordVisitScreen() {
                 { backgroundColor: theme.accent },
               ]}
             >
-              <Ionicons
+              <Icon
                 name="headset"
                 size={48}
                 color="white"
@@ -530,7 +530,7 @@ export default function RecordVisitScreen() {
               onPress={handlePlayPause}
               style={[styles.recordButton, { backgroundColor: theme.accent }]}
             >
-              <Ionicons name={isPlaying ? "pause" : "play"} size={32} color="white" />
+              <Icon name={isPlaying ? "pause" : "play"} size={32} color="white" />
             </Pressable>
           </View>
 
@@ -539,14 +539,14 @@ export default function RecordVisitScreen() {
               onPress={handleReRecord}
               style={[styles.reviewButton, { backgroundColor: "rgba(255,255,255,0.2)" }]}
             >
-              <Ionicons name="refresh" size={20} color="white" />
+              <Icon name="refresh" size={20} color="white" />
               <ThemedText style={styles.reviewButtonText}>Re-record</ThemedText>
             </Pressable>
             <Pressable
               onPress={handleSaveVisit}
               style={[styles.reviewButton, { backgroundColor: "white" }]}
             >
-              <Ionicons name="checkmark" size={20} color={theme.primary} />
+              <Icon name="check" size={20} color={theme.primary} />
               <ThemedText style={[styles.reviewButtonText, { color: theme.primary }]}>
                 Save Visit
               </ThemedText>
@@ -564,7 +564,7 @@ export default function RecordVisitScreen() {
                 },
               ]}
             >
-              <Ionicons
+              <Icon
                 name="mic"
                 size={48}
                 color="white"
@@ -592,7 +592,7 @@ export default function RecordVisitScreen() {
                 onPress={handleRecord}
                 style={[styles.recordButton, { backgroundColor: "#FF6B6B" }]}
               >
-                <Ionicons name="radio-button-on" size={32} color="white" />
+                <Icon name="record" size={32} color="white" />
               </Pressable>
             ) : (
               <>
@@ -600,13 +600,13 @@ export default function RecordVisitScreen() {
                   onPress={handlePause}
                   style={[styles.controlButton, { backgroundColor: "rgba(255,255,255,0.3)" }]}
                 >
-                  <Ionicons name={isPaused ? "play" : "pause"} size={24} color="white" />
+                  <Icon name={isPaused ? "play" : "pause"} size={24} color="white" />
                 </Pressable>
                 <Pressable
                   onPress={handleStop}
                   style={[styles.controlButton, { backgroundColor: theme.accent }]}
                 >
-                  <Ionicons name="checkmark" size={24} color="white" />
+                  <Icon name="check" size={24} color="white" />
                 </Pressable>
               </>
             )}
@@ -702,16 +702,39 @@ const styles = StyleSheet.create({
     fontSize: 16,
     textAlign: "center",
   },
+  progressContainer: {
+    width: "100%",
+    marginBottom: Spacing["2xl"],
+  },
+  progressBar: {
+    height: 4,
+    backgroundColor: "rgba(255,255,255,0.3)",
+    borderRadius: 2,
+    overflow: "hidden",
+    marginBottom: Spacing.sm,
+  },
+  progressFill: {
+    height: "100%",
+  },
+  progressTime: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  progressTimeText: {
+    color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
+  },
   reviewButtons: {
     flexDirection: "row",
     gap: Spacing.md,
-    marginTop: Spacing.xl,
+    width: "100%",
   },
   reviewButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: Spacing.sm,
-    paddingHorizontal: Spacing.xl,
     paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
   },
@@ -720,36 +743,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
   },
-  progressContainer: {
-    width: "100%",
-    marginBottom: Spacing.xl,
-  },
-  progressBar: {
-    height: 4,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    borderRadius: 2,
-    overflow: "hidden",
-  },
-  progressFill: {
-    height: "100%",
-    borderRadius: 2,
-  },
-  progressTime: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginTop: Spacing.sm,
-  },
-  progressTimeText: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 12,
-  },
   processingContainer: {
     flex: 1,
   },
   processingContent: {
     flexGrow: 1,
     justifyContent: "center",
-    paddingHorizontal: Spacing.xl,
+    padding: Spacing.xl,
   },
   processingStatusContainer: {
     alignItems: "center",
@@ -796,10 +796,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
   viewHistoryButton: {
-    alignItems: "center",
-    paddingVertical: Spacing.md,
+    paddingVertical: Spacing.lg,
     borderRadius: BorderRadius.md,
-    marginTop: Spacing.lg,
+    alignItems: "center",
   },
   viewHistoryButtonText: {
     fontSize: 16,

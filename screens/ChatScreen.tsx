@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { View, StyleSheet, TextInput, Pressable, FlatList } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Ionicons } from "@expo/vector-icons";
+import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Message } from "@/context/AppContext";
@@ -110,7 +110,7 @@ export default function ChatScreen() {
             },
           ]}
         >
-          <Ionicons
+          <Icon
             name="send"
             size={20}
             color={inputText.trim() && !isLoading ? "white" : theme.textSecondary}
