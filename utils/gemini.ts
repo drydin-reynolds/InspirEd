@@ -195,6 +195,94 @@ Please provide a helpful, accurate response:`;
   }
 }
 
+export interface LessonSection {
+  title: string;
+  content: string;
+  keyTakeaway?: string;
+}
+
+export interface GeneratedLesson {
+  introduction: string;
+  sections: LessonSection[];
+  summary: string;
+  practicalTips: string[];
+}
+
+export async function generateModuleLesson(
+  moduleTitle: string,
+  moduleDescription: string,
+  topics: string[],
+  difficulty: string,
+  readingLevel: number = 8
+): Promise<GeneratedLesson> {
+  try {
+    const prompt = `You are creating educational content for parents of children with chronic pulmonary conditions. Generate a comprehensive lesson for the following learning module:
+
+MODULE: ${moduleTitle}
+DESCRIPTION: ${moduleDescription}
+TOPICS TO COVER: ${topics.join(", ")}
+DIFFICULTY LEVEL: ${difficulty}
+
+IMPORTANT GUIDELINES:
+1. Use clear, simple language appropriate for a ${readingLevel}th grade reading level
+2. Be empathetic - these parents are managing their child's chronic condition
+3. Focus on practical, actionable information parents can use
+4. Explain medical terms in simple, everyday language
+5. NEVER provide specific medical advice - always encourage consulting with their healthcare provider
+6. Make the content encouraging and supportive
+7. Include real-world examples parents can relate to
+
+Generate the lesson in the following JSON format (respond with ONLY valid JSON, no markdown):
+{
+  "introduction": "A welcoming 2-3 sentence introduction to the topic",
+  "sections": [
+    {
+      "title": "Section title",
+      "content": "2-4 paragraphs of educational content for this section",
+      "keyTakeaway": "One sentence summarizing the key point"
+    }
+  ],
+  "summary": "A brief summary of what was covered",
+  "practicalTips": ["Tip 1", "Tip 2", "Tip 3"]
+}
+
+Create 3-4 sections covering the main topics. Each section should be informative but concise.`;
+
+    const response = await getAI().models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [prompt],
+    });
+
+    const text = response.text || "";
+    
+    // Try to parse the JSON response
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("No valid JSON found in response");
+    }
+    
+    const lesson = JSON.parse(jsonMatch[0]) as GeneratedLesson;
+    return lesson;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Gemini lesson generation error:", errorMessage);
+    
+    // Return a fallback lesson structure
+    return {
+      introduction: "We're having trouble loading this lesson right now. Please try again in a moment, or use the AI Assistant below to ask questions about this topic.",
+      sections: [
+        {
+          title: "Content Unavailable",
+          content: "The lesson content couldn't be generated at this time. You can still learn about this topic by asking the AI Learning Assistant questions.",
+          keyTakeaway: "Try refreshing or ask the AI Assistant for help with this topic.",
+        },
+      ],
+      summary: "Please try again later or use the AI Assistant for help.",
+      practicalTips: ["Ask the AI Assistant about specific topics you'd like to learn about"],
+    };
+  }
+}
+
 export async function askEducationalQuestion(
   question: string,
   conversationHistory: { text: string; isUser: boolean }[] = [],

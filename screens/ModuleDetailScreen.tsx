@@ -1,23 +1,138 @@
-import React from "react";
-import { View, StyleSheet, ScrollView } from "react-native";
+import React, { useState, useEffect } from "react";
+import { View, StyleSheet, Pressable, TextInput, ActivityIndicator } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
+import { ScreenKeyboardAwareScrollView } from "@/components/ScreenKeyboardAwareScrollView";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext, Message } from "@/context/AppContext";
 import { useRoute, useNavigation } from "@react-navigation/native";
+import { generateModuleLesson, askEducationalQuestion, GeneratedLesson } from "@/utils/gemini";
 
 export default function ModuleDetailScreen() {
   const { theme } = useTheme();
-  const { learningModules, updateModuleProgress, completeModule } = useAppContext();
+  const { learningModules, updateModuleProgress, completeModule, readingLevel } = useAppContext();
   const route = useRoute<any>();
   const navigation = useNavigation();
   const moduleId = route.params?.moduleId;
 
   const module = learningModules.find((m) => m.id === moduleId);
+
+  const [lesson, setLesson] = useState<GeneratedLesson | null>(null);
+  const [isLoadingLesson, setIsLoadingLesson] = useState(false);
+  const [currentSection, setCurrentSection] = useState(0);
+  const [showLesson, setShowLesson] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Message[]>([]);
+  const [inputText, setInputText] = useState("");
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+
+  const loadLesson = async () => {
+    if (!module) return;
+    
+    setIsLoadingLesson(true);
+    setShowLesson(true);
+    
+    try {
+      const generatedLesson = await generateModuleLesson(
+        module.title,
+        module.description,
+        module.topics,
+        module.difficulty,
+        readingLevel
+      );
+      
+      setLesson(generatedLesson);
+      
+      if (module.progress === 0) {
+        updateModuleProgress(module.id, 10);
+      }
+    } catch (error) {
+      console.error("Failed to generate lesson:", error);
+      setLesson({
+        introduction: "We're having trouble loading this lesson right now. Please try again in a moment.",
+        sections: [
+          {
+            title: "Content Unavailable",
+            content: "The lesson content couldn't be generated at this time. You can still ask the AI Learning Assistant questions about this topic by going back and using the chat feature.",
+            keyTakeaway: "Try again later or ask the AI Assistant for help.",
+          },
+        ],
+        summary: "Please try again later.",
+        practicalTips: ["Check your internet connection and try again"],
+      });
+    } finally {
+      setIsLoadingLesson(false);
+    }
+  };
+
+  const handleNextSection = () => {
+    if (!lesson) return;
+    
+    const totalSections = lesson.sections.length + 2; // intro + sections + summary
+    const newSection = currentSection + 1;
+    setCurrentSection(newSection);
+    
+    const progressPercent = Math.round(((newSection + 1) / totalSections) * 100);
+    if (module) {
+      updateModuleProgress(module.id, Math.min(progressPercent, 95));
+    }
+  };
+
+  const handlePrevSection = () => {
+    if (currentSection > 0) {
+      setCurrentSection(currentSection - 1);
+    }
+  };
+
+  const handleCompleteModule = () => {
+    if (module) {
+      completeModule(module.id);
+      navigation.goBack();
+    }
+  };
+
+  const handleAskQuestion = async () => {
+    if (!inputText.trim() || isLoadingChat || !module) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      isUser: true,
+      timestamp: new Date(),
+    };
+
+    setChatMessages((prev) => [...prev, userMessage]);
+    const questionText = inputText.trim();
+    setInputText("");
+    setIsLoadingChat(true);
+
+    const moduleContext = `The user is learning about "${module.title}". ${module.description}. Topics include: ${module.topics.join(", ")}.`;
+    
+    const conversationHistory = chatMessages.map((msg) => ({
+      text: msg.text,
+      isUser: msg.isUser,
+    }));
+
+    const response = await askEducationalQuestion(
+      `Context: ${moduleContext}\n\nQuestion: ${questionText}`,
+      conversationHistory,
+      readingLevel
+    );
+
+    const aiMessage: Message = {
+      id: (Date.now() + 1).toString(),
+      text: response,
+      isUser: false,
+      timestamp: new Date(),
+    };
+
+    setChatMessages((prev) => [...prev, aiMessage]);
+    setIsLoadingChat(false);
+  };
 
   if (!module) {
     return (
@@ -29,16 +144,211 @@ export default function ModuleDetailScreen() {
     );
   }
 
-  const handleStartModule = () => {
-    if (module.progress === 0) {
-      updateModuleProgress(module.id, 10);
-    }
-  };
+  if (showChat) {
+    return (
+      <ScreenKeyboardAwareScrollView>
+        <View style={styles.container}>
+          <Pressable onPress={() => setShowChat(false)} style={styles.backButton}>
+            <Icon name="chevron-back" size={24} color={theme.primary} />
+            <ThemedText style={{ color: theme.primary, fontSize: 16, fontWeight: "600" }}>
+              Back to Lesson
+            </ThemedText>
+          </Pressable>
 
-  const handleCompleteModule = () => {
-    completeModule(module.id);
-    navigation.goBack();
-  };
+          <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
+            <View style={styles.cardHeader}>
+              <Icon name="chat" size={24} color={theme.accent} />
+              <ThemedText style={styles.cardTitle}>Ask About This Topic</ThemedText>
+            </View>
+            <ThemedText style={[styles.helperText, { color: theme.textSecondary }]}>
+              Have questions about {module.title.toLowerCase()}? Ask and I'll help explain.
+            </ThemedText>
+          </ThemedView>
+
+          <View style={styles.chatMessages}>
+            {chatMessages.map((msg) => (
+              <View key={msg.id} style={[styles.messageBubble, msg.isUser && styles.userMessage]}>
+                <View
+                  style={[
+                    styles.messageContent,
+                    { backgroundColor: msg.isUser ? theme.primary : theme.backgroundSecondary },
+                  ]}
+                >
+                  <ThemedText style={{ color: msg.isUser ? "white" : theme.text }}>
+                    {msg.text}
+                  </ThemedText>
+                </View>
+              </View>
+            ))}
+            {isLoadingChat && (
+              <View style={styles.messageBubble}>
+                <View style={[styles.messageContent, { backgroundColor: theme.backgroundSecondary }]}>
+                  <ThemedText style={{ color: theme.textSecondary }}>Thinking...</ThemedText>
+                </View>
+              </View>
+            )}
+          </View>
+
+          <ThemedView style={[styles.inputCard, { backgroundColor: theme.backgroundSecondary }]}>
+            <TextInput
+              style={[styles.input, { color: theme.text }]}
+              value={inputText}
+              onChangeText={setInputText}
+              placeholder="Ask a question..."
+              placeholderTextColor={theme.textSecondary}
+              multiline
+              maxLength={500}
+            />
+            <Pressable
+              onPress={handleAskQuestion}
+              disabled={!inputText.trim() || isLoadingChat}
+              style={[
+                styles.sendButton,
+                { backgroundColor: inputText.trim() && !isLoadingChat ? theme.primary : theme.backgroundDefault },
+              ]}
+            >
+              <Icon name="send" size={20} color={inputText.trim() && !isLoadingChat ? "white" : theme.textSecondary} />
+            </Pressable>
+          </ThemedView>
+        </View>
+      </ScreenKeyboardAwareScrollView>
+    );
+  }
+
+  if (showLesson && isLoadingLesson) {
+    return (
+      <ScreenScrollView>
+        <View style={styles.container}>
+          <ThemedView style={[styles.loadingCard, { backgroundColor: theme.backgroundSecondary }]}>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <ThemedText style={styles.loadingTitle}>Creating Your Lesson</ThemedText>
+            <ThemedText style={[styles.loadingText, { color: theme.textSecondary }]}>
+              Generating personalized content about {module.title.toLowerCase()}...
+            </ThemedText>
+          </ThemedView>
+        </View>
+      </ScreenScrollView>
+    );
+  }
+
+  if (showLesson && lesson) {
+    const totalSections = lesson.sections.length + 2;
+    const isIntro = currentSection === 0;
+    const isSummary = currentSection === totalSections - 1;
+    const sectionIndex = currentSection - 1;
+
+    return (
+      <ScreenScrollView>
+        <View style={styles.container}>
+          <View style={styles.progressHeader}>
+            <View style={[styles.lessonProgressBar, { backgroundColor: theme.backgroundSecondary }]}>
+              <View
+                style={[
+                  styles.lessonProgressFill,
+                  { backgroundColor: theme.primary, width: `${((currentSection + 1) / totalSections) * 100}%` },
+                ]}
+              />
+            </View>
+            <ThemedText style={[styles.progressLabel, { color: theme.textSecondary }]}>
+              {currentSection + 1} of {totalSections}
+            </ThemedText>
+          </View>
+
+          {isIntro ? (
+            <ThemedView style={[styles.lessonCard, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={[styles.lessonBadge, { backgroundColor: theme.primary }]}>
+                <ThemedText style={styles.lessonBadgeText}>Introduction</ThemedText>
+              </View>
+              <ThemedText style={styles.lessonTitle}>{module.title}</ThemedText>
+              <ThemedText style={styles.lessonContent}>{lesson.introduction}</ThemedText>
+              <View style={styles.topicsPreview}>
+                <ThemedText style={[styles.topicsLabel, { color: theme.textSecondary }]}>
+                  In this lesson, you'll learn about:
+                </ThemedText>
+                {module.topics.map((topic, idx) => (
+                  <View key={idx} style={styles.topicRow}>
+                    <Icon name="checkmark-circle" size={16} color={theme.accent} />
+                    <ThemedText style={styles.topicItem}>{topic}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            </ThemedView>
+          ) : isSummary ? (
+            <ThemedView style={[styles.lessonCard, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={[styles.lessonBadge, { backgroundColor: theme.success }]}>
+                <ThemedText style={styles.lessonBadgeText}>Summary</ThemedText>
+              </View>
+              <ThemedText style={styles.lessonTitle}>What You Learned</ThemedText>
+              <ThemedText style={styles.lessonContent}>{lesson.summary}</ThemedText>
+              
+              <View style={[styles.tipsCard, { backgroundColor: theme.accent + "20" }]}>
+                <ThemedText style={[styles.tipsTitle, { color: theme.accent }]}>Practical Tips</ThemedText>
+                {lesson.practicalTips.map((tip, idx) => (
+                  <View key={idx} style={styles.tipRow}>
+                    <ThemedText style={[styles.tipNumber, { color: theme.accent }]}>{idx + 1}.</ThemedText>
+                    <ThemedText style={styles.tipText}>{tip}</ThemedText>
+                  </View>
+                ))}
+              </View>
+            </ThemedView>
+          ) : (
+            <ThemedView style={[styles.lessonCard, { backgroundColor: theme.backgroundSecondary }]}>
+              <View style={[styles.lessonBadge, { backgroundColor: theme.primary }]}>
+                <ThemedText style={styles.lessonBadgeText}>Section {sectionIndex + 1}</ThemedText>
+              </View>
+              <ThemedText style={styles.lessonTitle}>{lesson.sections[sectionIndex].title}</ThemedText>
+              <ThemedText style={styles.lessonContent}>{lesson.sections[sectionIndex].content}</ThemedText>
+              {lesson.sections[sectionIndex].keyTakeaway && (
+                <View style={[styles.takeawayCard, { backgroundColor: theme.primary + "15", borderColor: theme.primary }]}>
+                  <Icon name="sparkles" size={20} color={theme.primary} />
+                  <View style={styles.takeawayContent}>
+                    <ThemedText style={[styles.takeawayLabel, { color: theme.primary }]}>Key Takeaway</ThemedText>
+                    <ThemedText style={styles.takeawayText}>{lesson.sections[sectionIndex].keyTakeaway}</ThemedText>
+                  </View>
+                </View>
+              )}
+            </ThemedView>
+          )}
+
+          <View style={styles.navigationRow}>
+            {currentSection > 0 ? (
+              <Pressable onPress={handlePrevSection} style={[styles.navButton, { borderColor: theme.border }]}>
+                <Icon name="chevron-back" size={20} color={theme.text} />
+                <ThemedText>Previous</ThemedText>
+              </Pressable>
+            ) : (
+              <View style={styles.navButtonPlaceholder} />
+            )}
+
+            {isSummary ? (
+              <Button onPress={handleCompleteModule} style={{ flex: 1 }}>
+                <Icon name="check" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+                Complete Lesson
+              </Button>
+            ) : (
+              <Pressable
+                onPress={handleNextSection}
+                style={[styles.navButton, styles.navButtonPrimary, { backgroundColor: theme.primary }]}
+              >
+                <ThemedText style={{ color: "white" }}>Next</ThemedText>
+                <Icon name="chevron-right" size={20} color="white" />
+              </Pressable>
+            )}
+          </View>
+
+          <Pressable
+            onPress={() => setShowChat(true)}
+            style={[styles.helpButton, { backgroundColor: theme.accent + "20", borderColor: theme.accent }]}
+          >
+            <Icon name="help" size={20} color={theme.accent} />
+            <ThemedText style={{ color: theme.accent, fontWeight: "600" }}>
+              Have questions? Ask AI for help
+            </ThemedText>
+          </Pressable>
+        </View>
+      </ScreenScrollView>
+    );
+  }
 
   return (
     <ScreenScrollView>
@@ -70,17 +380,18 @@ export default function ModuleDetailScreen() {
 
         <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
           <View style={styles.cardHeader}>
-            <Icon name="book" size={24} color={theme.primary} />
-            <ThemedText style={styles.cardTitle}>Module Content</ThemedText>
+            <Icon name="sparkles" size={24} color={theme.primary} />
+            <ThemedText style={styles.cardTitle}>AI-Powered Learning</ThemedText>
           </View>
           <ThemedText style={[styles.contentText, { color: theme.textSecondary }]}>
-            This learning module contains carefully curated information from trusted medical sources.
-            All content is adjusted to your selected reading level ({module.difficulty}).
+            This lesson is generated just for you, adapted to your communication style preference. 
+            Content is created by AI to help you understand important concepts about your child's care.
           </ThemedText>
-          <ThemedText style={[styles.contentText, { color: theme.textSecondary }]}>
-            Content includes interactive lessons, visual diagrams, real-world examples, and
-            knowledge checks to ensure understanding.
-          </ThemedText>
+          <View style={[styles.disclaimerBox, { backgroundColor: theme.warning + "15", borderColor: theme.warning }]}>
+            <ThemedText style={[styles.disclaimerText, { color: theme.textSecondary }]}>
+              This educational content is for informational purposes only and is not a substitute for professional medical advice. Always consult your child's healthcare team about specific medical decisions.
+            </ThemedText>
+          </View>
         </ThemedView>
 
         {module.progress > 0 && !module.completed && (
@@ -88,13 +399,7 @@ export default function ModuleDetailScreen() {
             <ThemedText style={styles.sectionTitle}>Your Progress</ThemedText>
             <View style={[styles.progressBar, { backgroundColor: theme.backgroundDefault }]}>
               <View
-                style={[
-                  styles.progressFill,
-                  {
-                    backgroundColor: theme.primary,
-                    width: `${module.progress}%`,
-                  },
-                ]}
+                style={[styles.progressFill, { backgroundColor: theme.primary, width: `${module.progress}%` }]}
               />
             </View>
             <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
@@ -105,36 +410,25 @@ export default function ModuleDetailScreen() {
 
         {module.completed ? (
           <ThemedView
-            style={[
-              styles.completedCard,
-              {
-                backgroundColor: theme.success + "20",
-                borderColor: theme.success,
-              },
-            ]}
+            style={[styles.completedCard, { backgroundColor: theme.success + "20", borderColor: theme.success }]}
           >
             <Icon name="checkmark-circle" size={48} color={theme.success} />
             <ThemedText style={[styles.completedTitle, { color: theme.success }]}>
-              Module Completed!
+              Lesson Completed!
             </ThemedText>
             <ThemedText style={[styles.completedText, { color: theme.textSecondary }]}>
-              Great work! You've mastered this topic.
+              Great work! You've mastered this topic. Tap below to review the lesson again.
             </ThemedText>
+            <Button onPress={loadLesson} style={{ marginTop: Spacing.md }}>
+              <Icon name="refresh" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+              Review Lesson
+            </Button>
           </ThemedView>
         ) : (
-          <>
-            {module.progress === 0 ? (
-              <Button onPress={handleStartModule}>
-                <Icon name="play" size={20} color="white" style={{ marginRight: Spacing.sm }} />
-                Start Learning
-              </Button>
-            ) : (
-              <Button onPress={handleCompleteModule}>
-                <Icon name="check" size={20} color="white" style={{ marginRight: Spacing.sm }} />
-                Mark as Complete
-              </Button>
-            )}
-          </>
+          <Button onPress={loadLesson}>
+            <Icon name="play" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            {module.progress > 0 ? "Continue Learning" : "Start Learning"}
+          </Button>
         )}
       </View>
     </ScreenScrollView>
@@ -238,5 +532,203 @@ const styles = StyleSheet.create({
   completedText: {
     fontSize: 16,
     textAlign: "center",
+  },
+  loadingCard: {
+    padding: Spacing["3xl"],
+    borderRadius: BorderRadius.md,
+    alignItems: "center",
+    gap: Spacing.lg,
+  },
+  loadingTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+  },
+  loadingText: {
+    fontSize: 15,
+    textAlign: "center",
+  },
+  progressHeader: {
+    gap: Spacing.sm,
+  },
+  lessonProgressBar: {
+    height: 6,
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  lessonProgressFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  progressLabel: {
+    fontSize: 12,
+    textAlign: "center",
+  },
+  lessonCard: {
+    padding: Spacing.xl,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.lg,
+  },
+  lessonBadge: {
+    alignSelf: "flex-start",
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: BorderRadius.sm,
+  },
+  lessonBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "white",
+  },
+  lessonTitle: {
+    fontSize: 22,
+    fontWeight: "700",
+    lineHeight: 28,
+  },
+  lessonContent: {
+    fontSize: 16,
+    lineHeight: 26,
+  },
+  topicsPreview: {
+    gap: Spacing.sm,
+    marginTop: Spacing.md,
+  },
+  topicsLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    marginBottom: Spacing.xs,
+  },
+  topicRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  takeawayCard: {
+    flexDirection: "row",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.md,
+    alignItems: "flex-start",
+  },
+  takeawayContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  takeawayLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    textTransform: "uppercase",
+  },
+  takeawayText: {
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  tipsCard: {
+    padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
+    gap: Spacing.md,
+    marginTop: Spacing.md,
+  },
+  tipsTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  tipRow: {
+    flexDirection: "row",
+    gap: Spacing.sm,
+  },
+  tipNumber: {
+    fontSize: 15,
+    fontWeight: "600",
+    width: 20,
+  },
+  tipText: {
+    flex: 1,
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  navigationRow: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
+  navButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  navButtonPrimary: {
+    flex: 1,
+    justifyContent: "center",
+    borderWidth: 0,
+  },
+  navButtonPlaceholder: {
+    width: 100,
+  },
+  helpButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    borderWidth: 1,
+    gap: Spacing.sm,
+  },
+  backButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    marginBottom: Spacing.sm,
+  },
+  chatMessages: {
+    gap: Spacing.md,
+  },
+  messageBubble: {
+    maxWidth: "80%",
+  },
+  userMessage: {
+    alignSelf: "flex-end",
+  },
+  messageContent: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+  },
+  inputCard: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    flexDirection: "row",
+    gap: Spacing.md,
+    alignItems: "flex-end",
+  },
+  input: {
+    flex: 1,
+    fontSize: 15,
+    minHeight: 40,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  helperText: {
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  disclaimerBox: {
+    padding: Spacing.md,
+    borderRadius: BorderRadius.sm,
+    borderWidth: 1,
+    marginTop: Spacing.sm,
+  },
+  disclaimerText: {
+    fontSize: 13,
+    lineHeight: 18,
+    fontStyle: "italic",
   },
 });

@@ -1,9 +1,12 @@
 import React from "react";
+import { Pressable, Platform } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import EducationScreen from "@/screens/EducationScreen";
 import ModuleDetailScreen from "@/screens/ModuleDetailScreen";
 import { getCommonScreenOptions } from "./screenOptions";
 import { useTheme } from "@/hooks/useTheme";
+import { Icon } from "@/components/Icon";
+import { Spacing } from "@/constants/theme";
 
 export type EducationStackParamList = {
   Education: undefined;
@@ -25,7 +28,20 @@ export default function EducationStackNavigator() {
       <Stack.Screen
         name="ModuleDetail"
         component={ModuleDetailScreen}
-        options={{ title: "Module" }}
+        options={({ navigation }) => ({
+          title: "Module",
+          headerLeft: () => (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={{
+                padding: Spacing.sm,
+                marginLeft: Platform.OS === "web" ? Spacing.sm : 0,
+              }}
+            >
+              <Icon name="chevron-back" size={24} color={theme.text} />
+            </Pressable>
+          ),
+        })}
       />
     </Stack.Navigator>
   );
