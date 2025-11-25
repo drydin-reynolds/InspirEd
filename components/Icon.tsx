@@ -14,11 +14,14 @@ type IconName =
   | "stop"
   | "chevron-right"
   | "chevron-back"
+  | "chevron-up"
+  | "chevron-down"
   | "check"
   | "close"
   | "add"
   | "trash"
   | "document"
+  | "document-text"
   | "chat"
   | "send"
   | "help"
@@ -126,6 +129,14 @@ export function Icon({ name, size = 24, color = "#000", style }: IconProps) {
         return (
           <Polyline points="15,18 9,12 15,6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
         );
+      case "chevron-up":
+        return (
+          <Polyline points="6,15 12,9 18,15" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        );
+      case "chevron-down":
+        return (
+          <Polyline points="6,9 12,15 18,9" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        );
       case "check":
         return (
           <Polyline points="5,12 10,17 19,8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
@@ -158,6 +169,15 @@ export function Icon({ name, size = 24, color = "#000", style }: IconProps) {
             <Polyline points="14,2 14,8 20,8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
             <Line x1="8" y1="13" x2="16" y2="13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
             <Line x1="8" y1="17" x2="16" y2="17" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+          </>
+        );
+      case "document-text":
+        return (
+          <>
+            <Path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" stroke={color} strokeWidth={strokeWidth} fill="none" />
+            <Polyline points="14,2 14,8 20,8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <Line x1="8" y1="13" x2="16" y2="13" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+            <Line x1="8" y1="17" x2="12" y2="17" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
           </>
         );
       case "chat":

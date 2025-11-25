@@ -7,7 +7,7 @@ import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useAppContext, LearningModule, Message } from "@/context/AppContext";
+import { useAppContext, LearningModule, Message, Citation } from "@/context/AppContext";
 import { useNavigation } from "@react-navigation/native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { askEducationalQuestion } from "@/utils/gemini";
@@ -58,9 +58,10 @@ export default function EducationScreen() {
 
     const aiMessage: Message = {
       id: (Date.now() + 1).toString(),
-      text: response,
+      text: response.answer,
       isUser: false,
       timestamp: new Date(),
+      citations: response.citations,
     };
 
     addEducationChatMessage(aiMessage);
@@ -107,6 +108,9 @@ export default function EducationScreen() {
                     {msg.text}
                   </ThemedText>
                 </View>
+                {!msg.isUser && msg.citations && msg.citations.length > 0 ? (
+                  <CitationSection citations={msg.citations} />
+                ) : null}
               </View>
             ))}
             {isLoading && (
@@ -191,6 +195,63 @@ export default function EducationScreen() {
         })}
       </View>
     </ScreenScrollView>
+  );
+}
+
+function CitationSection({ citations }: { citations: Citation[] }) {
+  const { theme } = useTheme();
+  const [expanded, setExpanded] = useState(false);
+
+  if (citations.length === 0) return null;
+
+  return (
+    <View style={styles.citationContainer}>
+      <Pressable 
+        onPress={() => setExpanded(!expanded)} 
+        style={[styles.citationHeader, { backgroundColor: theme.primary + '15' }]}
+      >
+        <Icon name="document-text" size={14} color={theme.primary} />
+        <ThemedText style={[styles.citationHeaderText, { color: theme.primary }]}>
+          {citations.length} source{citations.length > 1 ? 's' : ''} referenced
+        </ThemedText>
+        <Icon 
+          name={expanded ? "chevron-up" : "chevron-down"} 
+          size={14} 
+          color={theme.primary} 
+        />
+      </Pressable>
+      
+      {expanded ? (
+        <View style={[styles.citationList, { borderColor: theme.primary + '30' }]}>
+          {citations.map((citation, index) => (
+            <View 
+              key={citation.id} 
+              style={[
+                styles.citationItem, 
+                index < citations.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: 1 }
+              ]}
+            >
+              <View style={styles.citationBadge}>
+                <ThemedText style={[styles.citationNumber, { color: theme.primary }]}>
+                  [{index + 1}]
+                </ThemedText>
+              </View>
+              <View style={styles.citationContent}>
+                <ThemedText style={[styles.citationTitle, { color: theme.text }]}>
+                  {citation.sourceTitle}
+                </ThemedText>
+                <ThemedText style={[styles.citationExcerpt, { color: theme.textSecondary }]}>
+                  {citation.excerpt}
+                </ThemedText>
+                <ThemedText style={[styles.citationRelevance, { color: theme.primary }]}>
+                  {citation.similarity}% relevance match
+                </ThemedText>
+              </View>
+            </View>
+          ))}
+        </View>
+      ) : null}
+    </View>
   );
 }
 
@@ -451,5 +512,55 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 40,
     maxHeight: 100,
+  },
+  citationContainer: {
+    marginTop: Spacing.sm,
+  },
+  citationHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.xs,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: BorderRadius.sm,
+  },
+  citationHeaderText: {
+    fontSize: 12,
+    fontWeight: "600",
+    flex: 1,
+  },
+  citationList: {
+    marginTop: Spacing.xs,
+    borderWidth: 1,
+    borderRadius: BorderRadius.sm,
+    overflow: "hidden",
+  },
+  citationItem: {
+    flexDirection: "row",
+    padding: Spacing.sm,
+    gap: Spacing.sm,
+  },
+  citationBadge: {
+    width: 24,
+  },
+  citationNumber: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  citationContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  citationTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  citationExcerpt: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  citationRelevance: {
+    fontSize: 10,
+    fontWeight: "500",
   },
 });

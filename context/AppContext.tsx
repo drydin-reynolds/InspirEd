@@ -16,11 +16,19 @@ export type Visit = {
   isProcessing: boolean;
 };
 
+export type Citation = {
+  id: string;
+  sourceTitle: string;
+  excerpt: string;
+  similarity: number;
+};
+
 export type Message = {
   id: string;
   text: string;
   isUser: boolean;
   timestamp: Date;
+  citations?: Citation[];
 };
 
 export type Question = {
