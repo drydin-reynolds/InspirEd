@@ -96,7 +96,7 @@ export default function HomeScreen() {
                 onPress={() => {
                   if (lastVisit) {
                     navigation.navigate("HistoryTab", {
-                      screen: "VisitDetail",
+                      screen: "Chat",
                       params: { visitId: lastVisit.id },
                     });
                   }
