@@ -176,6 +176,21 @@ Preferred communication style: Simple, everyday language.
   - Background AI processing updates
   - Legacy data compatibility (transcription field defaults to null)
 
+**Processing UI & User Feedback (November 2025):**
+- **Real-time Status Updates:**
+  - "Transcribing your visit..." with spinner during audio-to-text conversion
+  - "Creating your summary..." with context about reading level adaptation
+  - Success screen with checkmark when complete
+- **Results Preview:**
+  - Full summary displayed in accessible card format
+  - Transcription preview (first 6 lines) for verification
+  - Scrollable view for long content
+- **User Control:**
+  - Cancel button disabled during processing to prevent interruption
+  - "View in History" button navigates back when ready
+  - Error alerts with clear messaging if processing fails
+  - Visit always saved even if AI processing encounters errors
+
 ### Educational Content System
 
 **Learning Modules:**
