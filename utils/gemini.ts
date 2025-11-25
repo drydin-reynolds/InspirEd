@@ -194,3 +194,51 @@ Please provide a helpful, accurate response:`;
     return "I'm having trouble answering your question right now. Please try again in a moment.";
   }
 }
+
+export async function askEducationalQuestion(
+  question: string,
+  conversationHistory: { text: string; isUser: boolean }[] = [],
+  readingLevel: number = 8
+): Promise<string> {
+  try {
+    const historyContext = conversationHistory.length > 0
+      ? `PREVIOUS CONVERSATION:\n${conversationHistory.map(msg => 
+          `${msg.isUser ? 'Parent' : 'Assistant'}: ${msg.text}`
+        ).join('\n')}\n\n`
+      : '';
+
+    const prompt = `You are a caring and knowledgeable medical education assistant for parents of children with chronic pulmonary conditions. Your role is to help parents better understand medical concepts, treatments, and terminology related to their child's care.
+
+IMPORTANT GUIDELINES:
+1. Use clear, simple language appropriate for a ${readingLevel}th grade reading level
+2. Be empathetic and supportive - these parents are managing a child's chronic condition
+3. Focus on educational information about pulmonary health, treatments, medications, and medical procedures
+4. Explain medical terms in simple, everyday language
+5. NEVER provide specific medical advice or diagnosis - always encourage consulting with their healthcare provider for specific concerns
+6. If asked about specific symptoms or treatments, provide general educational information and emphasize discussing with their doctor
+7. Be encouraging and help parents feel more confident in understanding their child's care
+8. Keep responses concise but informative
+
+${historyContext}PARENT'S QUESTION:
+${question}
+
+Please provide a helpful, educational response:`;
+
+    const response = await getAI().models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [prompt],
+    });
+
+    const answer = response.text || "";
+    
+    if (!answer) {
+      return "I'm sorry, I couldn't generate a response. Please try asking your question again.";
+    }
+
+    return answer;
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error("Gemini Education error:", errorMessage);
+    return "I'm having trouble answering your question right now. Please try again in a moment.";
+  }
+}

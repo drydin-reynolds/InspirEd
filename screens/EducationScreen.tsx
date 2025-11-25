@@ -10,6 +10,7 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, LearningModule, Message } from "@/context/AppContext";
 import { useNavigation } from "@react-navigation/native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import { askEducationalQuestion } from "@/utils/gemini";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -40,14 +41,24 @@ export default function EducationScreen() {
     };
 
     addEducationChatMessage(userMessage);
+    const questionText = inputText.trim();
     setInputText("");
     setIsLoading(true);
 
-    await new Promise((resolve) => setTimeout(resolve, 1500));
+    const conversationHistory = educationChatMessages.map(msg => ({
+      text: msg.text,
+      isUser: msg.isUser,
+    }));
+
+    const response = await askEducationalQuestion(
+      questionText,
+      conversationHistory,
+      readingLevel
+    );
 
     const aiMessage: Message = {
       id: (Date.now() + 1).toString(),
-      text: "Based on trusted medical sources, this is a great question. Remember to always consult with your doctor about specific medical concerns. I can help explain concepts at your selected reading level.",
+      text: response,
       isUser: false,
       timestamp: new Date(),
     };
