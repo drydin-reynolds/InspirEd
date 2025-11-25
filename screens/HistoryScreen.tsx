@@ -3,7 +3,7 @@ import { View, StyleSheet, Pressable, Image, FlatList } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Visit } from "@/context/AppContext";
@@ -232,7 +232,7 @@ function VisitCard({
 
       {visit.isProcessing ? (
         <View style={styles.processingContainer}>
-          <Feather name="loader" size={16} color={theme.warning} />
+          <MaterialIcons name="loop" size={16} color={theme.warning} />
           <ThemedText style={[styles.processingText, { color: theme.warning }]}>
             Processing...
           </ThemedText>
@@ -262,7 +262,7 @@ function VisitCard({
               onPress={togglePlayback}
               style={[styles.playButton, { backgroundColor: theme.primary }]}
             >
-              <Feather name={isPlaying ? "pause" : "play"} size={20} color="white" />
+              <MaterialIcons name={isPlaying ? "pause" : "play-arrow"} size={20} color="white" />
             </Pressable>
 
             <View style={styles.progressContainer}>
@@ -304,7 +304,7 @@ function VisitCard({
             style={[styles.viewDetailsButton, { backgroundColor: theme.primary }]}
           >
             <ThemedText style={styles.viewDetailsText}>View Full Details</ThemedText>
-            <Feather name="chevron-right" size={16} color="white" />
+            <MaterialIcons name="chevron-right" size={16} color="white" />
           </Pressable>
         </View>
       )}

@@ -1,6 +1,6 @@
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { BlurView } from "expo-blur";
 import { Platform, StyleSheet } from "react-native";
 import HomeStackNavigator from "@/navigation/HomeStackNavigator";
@@ -55,7 +55,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Home",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="home" size={size} color={color} />
+            <MaterialIcons name="home" size={size} color={color} />
           ),
         }}
       />
@@ -65,7 +65,7 @@ export default function MainTabNavigator() {
         options={{
           title: "History",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="clock" size={size} color={color} />
+            <MaterialIcons name="history" size={size} color={color} />
           ),
         }}
       />
@@ -75,7 +75,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Planner",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="calendar" size={size} color={color} />
+            <MaterialIcons name="event" size={size} color={color} />
           ),
         }}
       />
@@ -85,7 +85,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Learn",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="book-open" size={size} color={color} />
+            <MaterialIcons name="menu-book" size={size} color={color} />
           ),
         }}
       />
@@ -95,7 +95,7 @@ export default function MainTabNavigator() {
         options={{
           title: "Profile",
           tabBarIcon: ({ color, size }) => (
-            <Feather name="user" size={size} color={color} />
+            <MaterialIcons name="person" size={size} color={color} />
           ),
         }}
       />

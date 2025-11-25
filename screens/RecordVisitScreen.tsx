@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { View, StyleSheet, Pressable, TextInput, Alert, ScrollView, ActivityIndicator, Platform } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext } from "@/context/AppContext";
@@ -439,7 +439,7 @@ export default function RecordVisitScreen() {
           ) : (
             <View style={styles.resultsContainer}>
               <View style={styles.resultHeader}>
-                <Feather name="check-circle" size={48} color="white" />
+                <MaterialIcons name="check-circle" size={48} color="white" />
                 <ThemedText style={styles.resultsTitle}>Visit Processed Successfully</ThemedText>
               </View>
 
@@ -483,7 +483,7 @@ export default function RecordVisitScreen() {
                 { backgroundColor: theme.accent },
               ]}
             >
-              <Feather
+              <MaterialIcons
                 name="headphones"
                 size={48}
                 color="white"
@@ -530,7 +530,7 @@ export default function RecordVisitScreen() {
               onPress={handlePlayPause}
               style={[styles.recordButton, { backgroundColor: theme.accent }]}
             >
-              <Feather name={isPlaying ? "pause" : "play"} size={32} color="white" />
+              <MaterialIcons name={isPlaying ? "pause" : "play-arrow"} size={32} color="white" />
             </Pressable>
           </View>
 
@@ -539,14 +539,14 @@ export default function RecordVisitScreen() {
               onPress={handleReRecord}
               style={[styles.reviewButton, { backgroundColor: "rgba(255,255,255,0.2)" }]}
             >
-              <Feather name="rotate-ccw" size={20} color="white" />
+              <MaterialIcons name="replay" size={20} color="white" />
               <ThemedText style={styles.reviewButtonText}>Re-record</ThemedText>
             </Pressable>
             <Pressable
               onPress={handleSaveVisit}
               style={[styles.reviewButton, { backgroundColor: "white" }]}
             >
-              <Feather name="check" size={20} color={theme.primary} />
+              <MaterialIcons name="check" size={20} color={theme.primary} />
               <ThemedText style={[styles.reviewButtonText, { color: theme.primary }]}>
                 Save Visit
               </ThemedText>
@@ -564,7 +564,7 @@ export default function RecordVisitScreen() {
                 },
               ]}
             >
-              <Feather
+              <MaterialIcons
                 name="mic"
                 size={48}
                 color="white"
@@ -592,7 +592,7 @@ export default function RecordVisitScreen() {
                 onPress={handleRecord}
                 style={[styles.recordButton, { backgroundColor: "#FF6B6B" }]}
               >
-                <Feather name="circle" size={32} color="white" />
+                <MaterialIcons name="fiber-manual-record" size={32} color="white" />
               </Pressable>
             ) : (
               <>
@@ -600,13 +600,13 @@ export default function RecordVisitScreen() {
                   onPress={handlePause}
                   style={[styles.controlButton, { backgroundColor: "rgba(255,255,255,0.3)" }]}
                 >
-                  <Feather name={isPaused ? "play" : "pause"} size={24} color="white" />
+                  <MaterialIcons name={isPaused ? "play-arrow" : "pause"} size={24} color="white" />
                 </Pressable>
                 <Pressable
                   onPress={handleStop}
                   style={[styles.controlButton, { backgroundColor: theme.accent }]}
                 >
-                  <Feather name="check" size={24} color="white" />
+                  <MaterialIcons name="check" size={24} color="white" />
                 </Pressable>
               </>
             )}
@@ -698,8 +698,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   instruction: {
-    fontSize: 16,
     color: "rgba(255,255,255,0.8)",
+    fontSize: 16,
     textAlign: "center",
   },
   progressContainer: {
@@ -707,28 +707,28 @@ const styles = StyleSheet.create({
     marginBottom: Spacing["2xl"],
   },
   progressBar: {
-    width: "100%",
     height: 4,
     backgroundColor: "rgba(255,255,255,0.3)",
     borderRadius: 2,
     overflow: "hidden",
-    marginBottom: Spacing.sm,
   },
   progressFill: {
     height: "100%",
+    borderRadius: 2,
   },
   progressTime: {
     flexDirection: "row",
     justifyContent: "space-between",
+    marginTop: Spacing.sm,
   },
   progressTimeText: {
-    fontSize: 12,
     color: "rgba(255,255,255,0.8)",
+    fontSize: 12,
   },
   reviewButtons: {
     flexDirection: "row",
     gap: Spacing.md,
-    marginTop: Spacing.xl,
+    width: "100%",
   },
   reviewButton: {
     flex: 1,
@@ -740,78 +740,69 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   reviewButtonText: {
+    color: "white",
     fontSize: 16,
     fontWeight: "600",
-    color: "white",
   },
   processingContainer: {
     flex: 1,
   },
   processingContent: {
     flexGrow: 1,
+    justifyContent: "center",
     paddingHorizontal: Spacing.xl,
-    paddingVertical: Spacing["2xl"],
   },
   processingStatusContainer: {
-    flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    gap: Spacing.xl,
+    gap: Spacing.lg,
   },
   processingTitle: {
+    color: "white",
     fontSize: 24,
     fontWeight: "700",
-    color: "white",
     textAlign: "center",
-    marginTop: Spacing.lg,
   },
   processingSubtitle: {
-    fontSize: 16,
     color: "rgba(255,255,255,0.8)",
+    fontSize: 16,
     textAlign: "center",
   },
   resultsContainer: {
-    gap: Spacing["2xl"],
+    gap: Spacing.xl,
   },
   resultHeader: {
     alignItems: "center",
-    gap: Spacing.lg,
-    marginBottom: Spacing.lg,
+    gap: Spacing.md,
   },
   resultsTitle: {
-    fontSize: 20,
-    fontWeight: "700",
     color: "white",
+    fontSize: 24,
+    fontWeight: "700",
     textAlign: "center",
   },
   resultSection: {
-    gap: Spacing.md,
+    gap: Spacing.sm,
   },
   resultLabel: {
+    color: "rgba(255,255,255,0.8)",
     fontSize: 14,
     fontWeight: "600",
-    color: "rgba(255,255,255,0.9)",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
   },
   resultCard: {
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: BorderRadius.md,
     padding: Spacing.lg,
+    borderRadius: BorderRadius.md,
   },
   resultText: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "white",
+    fontSize: 15,
+    lineHeight: 22,
   },
   viewHistoryButton: {
-    paddingVertical: Spacing.lg,
+    paddingVertical: Spacing.md,
     borderRadius: BorderRadius.md,
     alignItems: "center",
-    marginTop: Spacing.xl,
   },
   viewHistoryButtonText: {
-    fontSize: 18,
-    fontWeight: "700",
+    fontSize: 16,
+    fontWeight: "600",
   },
 });

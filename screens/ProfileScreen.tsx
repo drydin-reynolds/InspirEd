@@ -9,7 +9,7 @@ import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import type { ProfileStackParamList } from "@/navigation/ProfileStackNavigator";
 import { useAppContext } from "@/context/AppContext";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 
 type ProfileScreenProps = {
   navigation: NativeStackNavigationProp<ProfileStackParamList, "Profile">;
@@ -55,7 +55,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
         {isAdmin && (
           <Button onPress={() => navigation.navigate("AdminSources")}>
-            <Feather name="file" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <MaterialIcons name="description" size={20} color="white" style={{ marginRight: Spacing.sm }} />
             Manage Trusted Sources
           </Button>
         )}
@@ -71,7 +71,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
               },
             ]}
           >
-            <Feather name="shield" size={16} color={isAdmin ? "white" : theme.textSecondary} />
+            <MaterialIcons name="shield" size={16} color={isAdmin ? "white" : theme.textSecondary} />
             <ThemedText style={{ color: isAdmin ? "white" : theme.textSecondary, fontSize: 12 }}>
               {isAdmin ? "Admin Mode" : "Enable Admin"}
             </ThemedText>

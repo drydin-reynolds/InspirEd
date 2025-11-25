@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { Button } from "@/components/Button";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext } from "@/context/AppContext";
@@ -48,11 +48,11 @@ export default function ModuleDetailScreen() {
           <ThemedText style={styles.headerDescription}>{module.description}</ThemedText>
           <View style={styles.headerMetadata}>
             <View style={styles.metadataItem}>
-              <Feather name="clock" size={16} color="rgba(255,255,255,0.9)" />
+              <MaterialIcons name="schedule" size={16} color="rgba(255,255,255,0.9)" />
               <ThemedText style={styles.metadataText}>{module.duration}</ThemedText>
             </View>
             <View style={styles.metadataItem}>
-              <Feather name="award" size={16} color="rgba(255,255,255,0.9)" />
+              <MaterialIcons name="emoji-events" size={16} color="rgba(255,255,255,0.9)" />
               <ThemedText style={styles.metadataText}>{module.difficulty}</ThemedText>
             </View>
           </View>
@@ -70,7 +70,7 @@ export default function ModuleDetailScreen() {
 
         <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
           <View style={styles.cardHeader}>
-            <Feather name="book" size={24} color={theme.primary} />
+            <MaterialIcons name="menu-book" size={24} color={theme.primary} />
             <ThemedText style={styles.cardTitle}>Module Content</ThemedText>
           </View>
           <ThemedText style={[styles.contentText, { color: theme.textSecondary }]}>
@@ -113,7 +113,7 @@ export default function ModuleDetailScreen() {
               },
             ]}
           >
-            <Feather name="check-circle" size={48} color={theme.success} />
+            <MaterialIcons name="check-circle" size={48} color={theme.success} />
             <ThemedText style={[styles.completedTitle, { color: theme.success }]}>
               Module Completed!
             </ThemedText>
@@ -125,12 +125,12 @@ export default function ModuleDetailScreen() {
           <>
             {module.progress === 0 ? (
               <Button onPress={handleStartModule}>
-                <Feather name="play" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+                <MaterialIcons name="play-arrow" size={20} color="white" style={{ marginRight: Spacing.sm }} />
                 Start Learning
               </Button>
             ) : (
               <Button onPress={handleCompleteModule}>
-                <Feather name="check" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+                <MaterialIcons name="check" size={20} color="white" style={{ marginRight: Spacing.sm }} />
                 Mark as Complete
               </Button>
             )}

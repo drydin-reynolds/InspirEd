@@ -3,7 +3,7 @@ import { View, StyleSheet, Image, Pressable } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext } from "@/context/AppContext";
@@ -66,7 +66,7 @@ export default function HomeScreen() {
           {lastVisit ? (
             <>
               <ActionButton
-                icon="file-text"
+                icon="description"
                 title="Recent Visit"
                 subtitle={new Date(lastVisit.date).toLocaleDateString()}
                 onPress={() => navigation.navigate("HistoryTab")}
@@ -74,13 +74,13 @@ export default function HomeScreen() {
 
               <View style={styles.statsContainer}>
                 <StatCard
-                  icon="clock"
+                  icon="schedule"
                   value={totalVisits.toString()}
                   label="Total Visits"
                   theme={theme}
                 />
                 <StatCard
-                  icon="help-circle"
+                  icon="help-outline"
                   value={totalQuestions.toString()}
                   label="Questions Asked"
                   theme={theme}
@@ -88,7 +88,7 @@ export default function HomeScreen() {
               </View>
 
               <ActionButton
-                icon="message-circle"
+                icon="chat"
                 title="Ask a Question"
                 subtitle="Get answers about your visits"
                 onPress={() => {
@@ -102,7 +102,7 @@ export default function HomeScreen() {
               />
 
               <ActionButton
-                icon="calendar"
+                icon="event"
                 title="Prepare Next Visit"
                 subtitle="Plan questions and checklist"
                 onPress={() => navigation.navigate("PlannerTab")}
@@ -139,7 +139,7 @@ function StatCard({
         },
       ]}
     >
-      <Feather name={icon as any} size={24} color={theme.primary} />
+      <MaterialIcons name={icon as any} size={24} color={theme.primary} />
       <ThemedText style={styles.statValue}>{value}</ThemedText>
       <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
         {label}
@@ -184,14 +184,14 @@ function ActionButton({
         },
       ]}
     >
-      <Feather name={icon as any} size={24} color={theme.primary} />
+      <MaterialIcons name={icon as any} size={24} color={theme.primary} />
       <View style={styles.actionTextContainer}>
         <ThemedText style={styles.actionTitle}>{title}</ThemedText>
         <ThemedText style={[styles.actionSubtitle, { color: theme.textSecondary }]}>
           {subtitle}
         </ThemedText>
       </View>
-      <Feather name="chevron-right" size={20} color={theme.textSecondary} />
+      <MaterialIcons name="chevron-right" size={20} color={theme.textSecondary} />
     </AnimatedPressable>
   );
 }

@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { Button } from "@/components/Button";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, PDFSource } from "@/context/AppContext";
@@ -48,13 +48,13 @@ export default function AdminSourcesScreen() {
     return (
       <ScreenScrollView>
         <View style={styles.emptyContainer}>
-          <Feather name="file" size={64} color={theme.textSecondary} />
+          <MaterialIcons name="insert-drive-file" size={64} color={theme.textSecondary} />
           <ThemedText style={styles.emptyTitle}>No Sources Yet</ThemedText>
           <ThemedText style={[styles.emptyText, { color: theme.textSecondary }]}>
             Upload trusted medical PDFs to help the AI provide accurate, grounded answers.
           </ThemedText>
           <Button onPress={handleAddPDF}>
-            <Feather name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <MaterialIcons name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
             Add Trusted Source
           </Button>
         </View>
@@ -66,7 +66,7 @@ export default function AdminSourcesScreen() {
     <ScreenScrollView>
       <View style={styles.container}>
         <Button onPress={handleAddPDF}>
-          <Feather name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+          <MaterialIcons name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
           Add Trusted Source
         </Button>
 
@@ -104,7 +104,7 @@ function PDFSourceCard({
       ]}
     >
       <View style={styles.sourceIcon}>
-        <Feather name="file-text" size={32} color={theme.primary} />
+        <MaterialIcons name="description" size={32} color={theme.primary} />
       </View>
       <View style={styles.sourceInfo}>
         <ThemedText style={styles.sourceTitle}>{source.title}</ThemedText>
@@ -139,7 +139,7 @@ function PDFSourceCard({
         </View>
       </View>
       <Pressable onPress={() => onDelete(source.id)} style={styles.deleteButton}>
-        <Feather name="trash-2" size={20} color={theme.error} />
+        <MaterialIcons name="delete" size={20} color={theme.error} />
       </Pressable>
     </ThemedView>
   );

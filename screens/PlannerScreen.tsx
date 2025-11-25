@@ -4,7 +4,7 @@ import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { Button } from "@/components/Button";
-import { Feather } from "@expo/vector-icons";
+import { MaterialIcons } from "@expo/vector-icons";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Question } from "@/context/AppContext";
@@ -84,13 +84,13 @@ export default function PlannerScreen() {
             onSubmitEditing={handleAddQuestion}
           />
           <Button onPress={handleAddQuestion} disabled={!newQuestion.trim()}>
-            <Feather name="plus" size={20} color="white" />
+            <MaterialIcons name="add" size={20} color="white" />
           </Button>
         </ThemedView>
 
         {visits.length > 0 && (
           <Button onPress={handleSuggestQuestions} disabled={isLoadingSuggestions}>
-            <Feather name="zap" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <MaterialIcons name="auto-awesome" size={20} color="white" style={{ marginRight: Spacing.sm }} />
             {isLoadingSuggestions ? "Loading..." : "AI Suggest Questions"}
           </Button>
         )}
@@ -108,7 +108,7 @@ export default function PlannerScreen() {
                 onPress={() => handleAddCommonQuestion(text)}
               >
                 <ThemedText style={styles.starterText}>{text}</ThemedText>
-                <Feather name="plus-circle" size={20} color={theme.primary} />
+                <MaterialIcons name="add-circle" size={20} color={theme.primary} />
               </Pressable>
             ))}
           </View>
@@ -166,7 +166,7 @@ function QuestionItem({
             },
           ]}
         >
-          {question.checked && <Feather name="check" size={16} color="white" />}
+          {question.checked && <MaterialIcons name="check" size={16} color="white" />}
         </View>
         <ThemedText
           style={[
@@ -178,7 +178,7 @@ function QuestionItem({
         </ThemedText>
       </Pressable>
       <Pressable onPress={() => onDelete(question.id)} style={styles.deleteButton}>
-        <Feather name="x" size={20} color={theme.textSecondary} />
+        <MaterialIcons name="close" size={20} color={theme.textSecondary} />
       </Pressable>
     </ThemedView>
   );
