@@ -78,7 +78,7 @@ export default function HomeScreen() {
                   value={totalVisits.toString()}
                   label="Total Visits"
                   theme={theme}
-                  onPress={() => navigation.navigate("HistoryTab", { screen: "History" })}
+                  onPress={() => navigation.navigate("HistoryTab", { screen: "HistoryList" })}
                 />
                 <StatCard
                   icon="help"
