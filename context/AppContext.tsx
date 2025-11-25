@@ -66,6 +66,7 @@ type AppContextType = {
   visits: Visit[];
   addVisit: (visit: Visit) => void;
   updateVisit: (id: string, updates: Partial<Visit>) => void;
+  deleteVisit: (id: string) => void;
   chatMessages: { [visitId: string]: Message[] };
   addChatMessage: (visitId: string, message: Message) => void;
   plannerQuestions: Question[];
@@ -193,6 +194,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
         console.error("Error updating visit:", error)
       );
       return updatedVisits;
+    });
+  };
+
+  const deleteVisit = (id: string) => {
+    setVisits((prev) => {
+      const filteredVisits = prev.filter((visit) => visit.id !== id);
+      AsyncStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(filteredVisits)).catch((error) =>
+        console.error("Error deleting visit:", error)
+      );
+      return filteredVisits;
+    });
+    setChatMessages((prev) => {
+      const { [id]: _, ...rest } = prev;
+      AsyncStorage.setItem(STORAGE_KEYS.CHAT_MESSAGES, JSON.stringify(rest)).catch((error) =>
+        console.error("Error deleting chat messages:", error)
+      );
+      return rest;
     });
   };
 
@@ -359,6 +377,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         visits,
         addVisit,
         updateVisit,
+        deleteVisit,
         chatMessages,
         addChatMessage,
         plannerQuestions,

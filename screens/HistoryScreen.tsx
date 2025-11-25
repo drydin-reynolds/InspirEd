@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Pressable, Image, FlatList } from "react-native";
+import { View, StyleSheet, Pressable, Image, FlatList, Alert } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
@@ -19,9 +19,24 @@ const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function HistoryScreen() {
   const { theme } = useTheme();
-  const { visits } = useAppContext();
+  const { visits, deleteVisit } = useAppContext();
   const navigation = useNavigation<any>();
   const [activeVisitId, setActiveVisitId] = useState<string | null>(null);
+
+  const handleDeleteVisit = (visitId: string, doctorName: string) => {
+    Alert.alert(
+      "Delete Visit",
+      `Are you sure you want to delete this visit${doctorName !== "Not specified" ? ` with Dr. ${doctorName}` : ""}? This cannot be undone.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: () => deleteVisit(visitId),
+        },
+      ]
+    );
+  };
 
   if (visits.length === 0) {
     return (
@@ -55,6 +70,7 @@ export default function HistoryScreen() {
             onPress={() => navigation.navigate("VisitDetail", { visitId: visit.id })}
             isActive={activeVisitId === visit.id}
             onPlaybackStart={() => handlePlaybackStart(visit.id)}
+            onDelete={() => handleDeleteVisit(visit.id, visit.doctorName)}
           />
         ))}
       </View>
@@ -67,11 +83,13 @@ function VisitCard({
   onPress,
   isActive,
   onPlaybackStart,
+  onDelete,
 }: {
   visit: Visit;
   onPress: () => void;
   isActive: boolean;
   onPlaybackStart: () => void;
+  onDelete: () => void;
 }) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
@@ -296,16 +314,27 @@ function VisitCard({
             </View>
           )}
 
-          <Pressable
-            onPress={(e) => {
-              e.stopPropagation();
-              onPress();
-            }}
-            style={[styles.viewDetailsButton, { backgroundColor: theme.primary }]}
-          >
-            <ThemedText style={styles.viewDetailsText}>View Full Details</ThemedText>
-            <Icon name="chevron-right" size={16} color="white" />
-          </Pressable>
+          <View style={styles.actionButtons}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onPress();
+              }}
+              style={[styles.viewDetailsButton, { backgroundColor: theme.primary }]}
+            >
+              <ThemedText style={styles.viewDetailsText}>View Full Details</ThemedText>
+              <Icon name="chevron-right" size={16} color="white" />
+            </Pressable>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              style={[styles.deleteButton, { backgroundColor: theme.error }]}
+            >
+              <Icon name="trash" size={18} color="white" />
+            </Pressable>
+          </View>
         </View>
       )}
     </AnimatedPressable>
@@ -440,7 +469,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     lineHeight: 20,
   },
+  actionButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
+  },
   viewDetailsButton: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -452,5 +486,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: "white",
+  },
+  deleteButton: {
+    width: 44,
+    height: 44,
+    borderRadius: BorderRadius.md,
+    justifyContent: "center",
+    alignItems: "center",
   },
 });
