@@ -78,12 +78,14 @@ export default function HomeScreen() {
                   value={totalVisits.toString()}
                   label="Total Visits"
                   theme={theme}
+                  onPress={() => navigation.navigate("HistoryTab")}
                 />
                 <StatCard
                   icon="help"
                   value={totalQuestions.toString()}
                   label="Questions Asked"
                   theme={theme}
+                  onPress={() => navigation.navigate("LearnTab")}
                 />
               </View>
 
@@ -123,15 +125,31 @@ function StatCard({
   value,
   label,
   theme,
+  onPress,
 }: {
   icon: "time" | "help";
   value: string;
   label: string;
   theme: any;
+  onPress?: () => void;
 }) {
+  const scale = useSharedValue(1);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
   return (
-    <ThemedView
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => {
+        scale.value = withSpring(0.96);
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1);
+      }}
       style={[
+        animatedStyle,
         styles.statCard,
         {
           backgroundColor: theme.backgroundSecondary,
@@ -144,7 +162,7 @@ function StatCard({
       <ThemedText style={[styles.statLabel, { color: theme.textSecondary }]}>
         {label}
       </ThemedText>
-    </ThemedView>
+    </AnimatedPressable>
   );
 }
 
