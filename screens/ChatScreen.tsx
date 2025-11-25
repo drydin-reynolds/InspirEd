@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, FlatList } from "react-native";
+import { View, StyleSheet, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Icon } from "@/components/Icon";
@@ -8,13 +8,17 @@ import { Spacing, BorderRadius } from "@/constants/theme";
 import { useAppContext, Message } from "@/context/AppContext";
 import { useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useHeaderHeight } from "@react-navigation/elements";
 import { askQuestionAboutVisit } from "@/utils/openai";
+
+const TAB_BAR_HEIGHT = 80;
 
 export default function ChatScreen() {
   const { theme } = useTheme();
   const { chatMessages, addChatMessage, visits, readingLevel } = useAppContext();
   const route = useRoute<any>();
   const insets = useSafeAreaInsets();
+  const headerHeight = useHeaderHeight();
   const visitId = route.params?.visitId;
   
   const [inputText, setInputText] = useState("");
@@ -54,14 +58,24 @@ export default function ChatScreen() {
     setIsLoading(false);
   };
 
+  const inputAreaHeight = 70 + TAB_BAR_HEIGHT;
+
   return (
-    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+    <KeyboardAvoidingView 
+      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
+      behavior={Platform.OS === "ios" ? "padding" : undefined}
+      keyboardVerticalOffset={headerHeight}
+    >
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
           styles.messageList,
-          { paddingBottom: insets.bottom + 80 },
+          { 
+            paddingTop: headerHeight + Spacing.md,
+            paddingBottom: inputAreaHeight + Spacing.lg,
+            flexGrow: 1,
+          },
         ]}
         renderItem={({ item }) => (
           <MessageBubble message={item} isUser={item.isUser} theme={theme} />
@@ -80,7 +94,7 @@ export default function ChatScreen() {
           styles.inputContainer,
           {
             backgroundColor: theme.backgroundSecondary,
-            paddingBottom: insets.bottom + Spacing.md,
+            bottom: TAB_BAR_HEIGHT,
             borderTopColor: theme.border,
           },
         ]}
@@ -117,7 +131,7 @@ export default function ChatScreen() {
           />
         </Pressable>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
