@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Pressable, Image, FlatList, Alert } from "react-native";
+import { View, StyleSheet, Pressable, Image, FlatList, Alert, Platform } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
@@ -24,18 +24,26 @@ export default function HistoryScreen() {
   const [activeVisitId, setActiveVisitId] = useState<string | null>(null);
 
   const handleDeleteVisit = (visitId: string, doctorName: string) => {
-    Alert.alert(
-      "Delete Visit",
-      `Are you sure you want to delete this visit${doctorName !== "Not specified" ? ` with Dr. ${doctorName}` : ""}? This cannot be undone.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: () => deleteVisit(visitId),
-        },
-      ]
-    );
+    const message = `Are you sure you want to delete this visit${doctorName !== "Not specified" ? ` with Dr. ${doctorName}` : ""}? This cannot be undone.`;
+    
+    if (Platform.OS === "web") {
+      if (window.confirm(message)) {
+        deleteVisit(visitId);
+      }
+    } else {
+      Alert.alert(
+        "Delete Visit",
+        message,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: () => deleteVisit(visitId),
+          },
+        ]
+      );
+    }
   };
 
   if (visits.length === 0) {
