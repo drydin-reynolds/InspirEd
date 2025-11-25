@@ -102,9 +102,12 @@ ${transcription}`,
       summary,
     };
   } catch (error) {
-    console.error("Gemini API error:", error);
-    throw new Error(
-      `Failed to process audio: ${error instanceof Error ? error.message : "Unknown error"}`
-    );
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
+    console.error("Gemini API error:", errorMessage);
+    if (errorStack) {
+      console.error("Error stack:", errorStack);
+    }
+    throw new Error(`Failed to process audio: ${errorMessage}`);
   }
 }
