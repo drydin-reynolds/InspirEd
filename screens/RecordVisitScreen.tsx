@@ -722,7 +722,7 @@ export default function RecordVisitScreen() {
           {!isRecording && (
             <>
               <ThemedText style={styles.instruction}>
-                Find a quiet spot and tap to start recording
+                Ready? Tap to start recording
               </ThemedText>
               <View style={styles.consentNotice}>
                 <Icon name="shield" size={14} color="rgba(255,255,255,0.8)" />
