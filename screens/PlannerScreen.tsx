@@ -95,25 +95,6 @@ export default function PlannerScreen() {
           </Button>
         )}
 
-        {plannerQuestions.length === 0 && (
-          <View style={styles.starterSection}>
-            <ThemedText style={styles.starterTitle}>Common Questions to Get Started</ThemedText>
-            <ThemedText style={[styles.starterDescription, { color: theme.textSecondary }]}>
-              Tap any question below to add it to your list:
-            </ThemedText>
-            {commonQuestions.map((text, index) => (
-              <Pressable
-                key={index}
-                style={[styles.starterCard, { backgroundColor: theme.backgroundSecondary }]}
-                onPress={() => handleAddCommonQuestion(text)}
-              >
-                <ThemedText style={styles.starterText}>{text}</ThemedText>
-                <Icon name="add-circle" size={20} color={theme.primary} />
-              </Pressable>
-            ))}
-          </View>
-        )}
-
         {plannerQuestions.length > 0 && (
           <View style={styles.questionsSection}>
             <ThemedText style={styles.sectionTitle}>Questions to Ask</ThemedText>
@@ -127,6 +108,25 @@ export default function PlannerScreen() {
             ))}
           </View>
         )}
+
+        <View style={styles.starterSection}>
+          <ThemedText style={styles.starterTitle}>
+            {plannerQuestions.length > 0 ? "Add More Questions" : "Common Questions to Get Started"}
+          </ThemedText>
+          <ThemedText style={[styles.starterDescription, { color: theme.textSecondary }]}>
+            Tap any question below to add it to your list:
+          </ThemedText>
+          {commonQuestions.map((text, index) => (
+            <Pressable
+              key={index}
+              style={[styles.starterCard, { backgroundColor: theme.backgroundSecondary }]}
+              onPress={() => handleAddCommonQuestion(text)}
+            >
+              <ThemedText style={styles.starterText}>{text}</ThemedText>
+              <Icon name="add-circle" size={20} color={theme.primary} />
+            </Pressable>
+          ))}
+        </View>
       </View>
     </ScreenScrollView>
   );
