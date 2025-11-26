@@ -311,6 +311,13 @@ export default function RecordVisitScreen() {
     if (!sound) return;
     
     try {
+      const status = await sound.getStatusAsync();
+      if (!status.isLoaded) {
+        Alert.alert("Playback Error", "Recording is no longer available.");
+        setSound(null);
+        return;
+      }
+
       if (isPlaying) {
         await sound.pauseAsync();
       } else {
@@ -318,13 +325,17 @@ export default function RecordVisitScreen() {
       }
     } catch (error) {
       console.error("Failed to play/pause audio:", error);
-      Alert.alert("Playback Error", "Could not play the recording.");
+      setSound(null);
     }
   };
 
   const handleReRecord = async () => {
     if (sound) {
-      await sound.unloadAsync();
+      try {
+        await sound.unloadAsync();
+      } catch (error) {
+        console.error("Error unloading sound:", error);
+      }
       setSound(null);
     }
     

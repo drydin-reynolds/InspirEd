@@ -88,12 +88,10 @@ export default function PlannerScreen() {
           </Button>
         </ThemedView>
 
-        {visits.length > 0 && (
-          <Button onPress={handleSuggestQuestions} disabled={isLoadingSuggestions}>
-            <Icon name="sparkles" size={20} color="white" style={{ marginRight: Spacing.sm }} />
-            {isLoadingSuggestions ? "Loading..." : "AI Suggest Questions"}
-          </Button>
-        )}
+        <Button onPress={handleSuggestQuestions} disabled={isLoadingSuggestions || visits.length === 0}>
+          <Icon name="sparkles" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+          {isLoadingSuggestions ? "Loading..." : visits.length === 0 ? "AI Suggest Questions (need a visit)" : "AI Suggest Questions"}
+        </Button>
 
         {plannerQuestions.length > 0 && (
           <View style={styles.questionsSection}>
