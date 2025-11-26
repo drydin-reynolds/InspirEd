@@ -5,7 +5,7 @@ import { ThemedView } from "@/components/ThemedView";
 import { Icon } from "@/components/Icon";
 import { useTheme } from "@/hooks/useTheme";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useAppContext } from "@/context/AppContext";
+import { useAppContext, Question } from "@/context/AppContext";
 import { useNavigation } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
@@ -36,11 +36,12 @@ import { Audio } from "expo-av";
 
 export default function RecordVisitScreen() {
   const { theme } = useTheme();
-  const { addVisit, updateVisit, readingLevel, privacyConsent, setPrivacyConsent } = useAppContext();
+  const { addVisit, updateVisit, readingLevel, privacyConsent, setPrivacyConsent, plannerQuestions, updatePlannerQuestion } = useAppContext();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   
   const [showConsentOverlay, setShowConsentOverlay] = useState(!privacyConsent);
+  const [questionsExpanded, setQuestionsExpanded] = useState(true);
   
   useEffect(() => {
     if (!privacyConsent) {
@@ -732,6 +733,63 @@ export default function RecordVisitScreen() {
               </View>
             </>
           )}
+
+          {isRecording && plannerQuestions.length > 0 && (
+            <View style={styles.questionsPanel}>
+              <Pressable 
+                style={styles.questionsPanelHeader}
+                onPress={() => setQuestionsExpanded(!questionsExpanded)}
+              >
+                <View style={styles.questionsPanelTitleRow}>
+                  <Icon name="document" size={18} color="white" />
+                  <ThemedText style={styles.questionsPanelTitle}>
+                    My Questions ({plannerQuestions.filter(q => !q.checked).length} remaining)
+                  </ThemedText>
+                </View>
+                <Icon 
+                  name={questionsExpanded ? "chevron-up" : "chevron-down"} 
+                  size={20} 
+                  color="white" 
+                />
+              </Pressable>
+              
+              {questionsExpanded && (
+                <ScrollView 
+                  style={styles.questionsScrollView}
+                  showsVerticalScrollIndicator={false}
+                >
+                  {plannerQuestions.map((question) => (
+                    <Pressable
+                      key={question.id}
+                      style={[
+                        styles.questionItem,
+                        question.checked && styles.questionItemChecked,
+                      ]}
+                      onPress={() => updatePlannerQuestion(question.id, { checked: !question.checked })}
+                    >
+                      <View
+                        style={[
+                          styles.questionCheckbox,
+                          question.checked && { backgroundColor: theme.accent, borderColor: theme.accent },
+                        ]}
+                      >
+                        {question.checked && <Icon name="check" size={14} color="white" />}
+                      </View>
+                      <ThemedText
+                        style={[
+                          styles.questionItemText,
+                          question.checked && styles.questionItemTextChecked,
+                        ]}
+                        numberOfLines={2}
+                      >
+                        {question.text}
+                      </ThemedText>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
         </View>
       )}
     </View>
@@ -1003,5 +1061,64 @@ const styles = StyleSheet.create({
   consentSecondaryButtonText: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 14,
+  },
+  questionsPanel: {
+    position: "absolute",
+    bottom: Spacing.xl,
+    left: Spacing.lg,
+    right: Spacing.lg,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    borderRadius: BorderRadius.lg,
+    overflow: "hidden",
+  },
+  questionsPanelHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: Spacing.md,
+    backgroundColor: "rgba(255,255,255,0.1)",
+  },
+  questionsPanelTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+  },
+  questionsPanelTitle: {
+    color: "white",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  questionsScrollView: {
+    maxHeight: 180,
+  },
+  questionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(255,255,255,0.1)",
+  },
+  questionItemChecked: {
+    opacity: 0.6,
+  },
+  questionCheckbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: "rgba(255,255,255,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  questionItemText: {
+    flex: 1,
+    color: "white",
+    fontSize: 14,
+    lineHeight: 18,
+  },
+  questionItemTextChecked: {
+    textDecorationLine: "line-through",
   },
 });
