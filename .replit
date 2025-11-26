@@ -34,6 +34,14 @@ localPort = 39839
 externalPort = 3001
 
 [[ports]]
+localPort = 40771
+externalPort = 6800
+
+[[ports]]
+localPort = 42951
+externalPort = 8008
+
+[[ports]]
 localPort = 43619
 externalPort = 8000
 
@@ -118,3 +126,8 @@ value = "1"
 path = "/*"
 name = "expo-sfv-version"
 value = "0"
+
+[userenv]
+
+[userenv.shared]
+GOOGLE_DRIVE_VIDEO_FOLDER_ID = "170vT1uVygivXxA4FL5zGF2B5qKUP-EhG"
