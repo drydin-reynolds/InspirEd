@@ -16,7 +16,9 @@ type IconName =
   | "chevron-back"
   | "chevron-up"
   | "chevron-down"
+  | "chevron-forward"
   | "check"
+  | "checkmark"
   | "close"
   | "add"
   | "trash"
@@ -34,7 +36,14 @@ type IconName =
   | "trophy"
   | "upload"
   | "checkmark-circle"
-  | "shield";
+  | "shield"
+  | "cloud-offline"
+  | "information-circle"
+  | "videocam"
+  | "videocam-off"
+  | "play-circle"
+  | "expand"
+  | "contract";
 
 type IconProps = {
   name: IconName;
@@ -279,6 +288,69 @@ export function Icon({ name, size = 24, color = "#000", style }: IconProps) {
           <>
             <Path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke={color} strokeWidth={strokeWidth} fill="none" />
             <Polyline points="9,12 11,14 15,10" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          </>
+        );
+      case "chevron-forward":
+        return (
+          <Polyline points="9,18 15,12 9,6" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        );
+      case "checkmark":
+        return (
+          <Polyline points="5,12 10,17 19,8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        );
+      case "cloud-offline":
+        return (
+          <>
+            <Path d="M22 12a5 5 0 00-5-5c-.5 0-1 .07-1.48.2A7 7 0 005 11.3 4 4 0 006 19h10" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
+            <Line x1="2" y1="2" x2="22" y2="22" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+          </>
+        );
+      case "information-circle":
+        return (
+          <>
+            <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={strokeWidth} fill="none" />
+            <Line x1="12" y1="16" x2="12" y2="12" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+            <Circle cx="12" cy="8" r="0.5" fill={color} />
+          </>
+        );
+      case "videocam":
+        return (
+          <>
+            <Rect x="2" y="6" width="13" height="12" rx="2" stroke={color} strokeWidth={strokeWidth} fill="none" />
+            <Path d="M15 10l5-3v10l-5-3" stroke={color} strokeWidth={strokeWidth} strokeLinejoin="round" fill="none" />
+          </>
+        );
+      case "videocam-off":
+        return (
+          <>
+            <Path d="M10.66 5H14a2 2 0 012 2v3.34l1 1L22 8v8" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
+            <Path d="M16 16v1a2 2 0 01-2 2H4a2 2 0 01-2-2V7a2 2 0 012-2h1" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" fill="none" />
+            <Line x1="1" y1="1" x2="23" y2="23" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+          </>
+        );
+      case "play-circle":
+        return (
+          <>
+            <Circle cx="12" cy="12" r="10" stroke={color} strokeWidth={strokeWidth} fill="none" />
+            <Path d="M10 8l6 4-6 4V8z" stroke={color} strokeWidth={strokeWidth} fill={color} strokeLinejoin="round" />
+          </>
+        );
+      case "expand":
+        return (
+          <>
+            <Polyline points="15,3 21,3 21,9" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <Polyline points="9,21 3,21 3,15" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <Line x1="21" y1="3" x2="14" y2="10" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+            <Line x1="3" y1="21" x2="10" y2="14" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+          </>
+        );
+      case "contract":
+        return (
+          <>
+            <Polyline points="4,14 10,14 10,20" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <Polyline points="20,10 14,10 14,4" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+            <Line x1="14" y1="10" x2="21" y2="3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+            <Line x1="3" y1="21" x2="10" y2="14" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
           </>
         );
       default:

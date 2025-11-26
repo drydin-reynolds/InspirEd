@@ -57,6 +57,23 @@ export type LearningModule = {
   topics: string[];
 };
 
+export type VideoWatchRecord = {
+  videoId: string;
+  watchedAt: Date;
+  completedPercent: number;
+};
+
+export type CachedVideo = {
+  id: string;
+  title: string;
+  description: string;
+  thumbnailUrl: string;
+  duration: string;
+  category: string;
+  order: number;
+  cachedAt: Date;
+};
+
 type AppContextType = {
   userName: string;
   setUserName: (name: string) => void;
@@ -95,6 +112,11 @@ type AppContextType = {
   completeModule: (id: string) => void;
   educationChatMessages: Message[];
   addEducationChatMessage: (message: Message) => void;
+  videoWatchHistory: VideoWatchRecord[];
+  addVideoWatchRecord: (record: VideoWatchRecord) => void;
+  getVideoWatchProgress: (videoId: string) => number;
+  cachedVideos: CachedVideo[];
+  setCachedVideos: (videos: CachedVideo[]) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -107,6 +129,8 @@ const STORAGE_KEYS = {
   PLANNER_QUESTIONS: "@InspirEd:plannerQuestions",
   PRIVACY_CONSENT: "@InspirEd:privacyConsent",
   PRIVACY_CONSENT_DATE: "@InspirEd:privacyConsentDate",
+  VIDEO_WATCH_HISTORY: "@InspirEd:videoWatchHistory",
+  CACHED_VIDEOS: "@InspirEd:cachedVideos",
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -124,6 +148,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [plannerQuestions, setPlannerQuestions] = useState<Question[]>([]);
   const [pdfSources, setPDFSources] = useState<PDFSource[]>([]);
   const [educationChatMessages, setEducationChatMessages] = useState<Message[]>([]);
+  const [videoWatchHistory, setVideoWatchHistory] = useState<VideoWatchRecord[]>([]);
+  const [cachedVideos, setCachedVideosState] = useState<CachedVideo[]>([]);
   const [learningModules, setLearningModules] = useState<LearningModule[]>([
     {
       id: "1",
@@ -362,6 +388,39 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setEducationChatMessages((prev) => [...prev, message]);
   };
 
+  const addVideoWatchRecord = (record: VideoWatchRecord) => {
+    setVideoWatchHistory((prev) => {
+      const existingIndex = prev.findIndex((r) => r.videoId === record.videoId);
+      let newHistory;
+      if (existingIndex >= 0) {
+        newHistory = [...prev];
+        if (record.completedPercent > newHistory[existingIndex].completedPercent) {
+          newHistory[existingIndex] = record;
+        } else {
+          newHistory[existingIndex] = { ...newHistory[existingIndex], watchedAt: record.watchedAt };
+        }
+      } else {
+        newHistory = [...prev, record];
+      }
+      AsyncStorage.setItem(STORAGE_KEYS.VIDEO_WATCH_HISTORY, JSON.stringify(newHistory)).catch(
+        (error) => console.error("Error saving video watch history:", error)
+      );
+      return newHistory;
+    });
+  };
+
+  const getVideoWatchProgress = (videoId: string): number => {
+    const record = videoWatchHistory.find((r) => r.videoId === videoId);
+    return record?.completedPercent || 0;
+  };
+
+  const setCachedVideos = (videos: CachedVideo[]) => {
+    setCachedVideosState(videos);
+    AsyncStorage.setItem(STORAGE_KEYS.CACHED_VIDEOS, JSON.stringify(videos)).catch(
+      (error) => console.error("Error saving cached videos:", error)
+    );
+  };
+
   const completeOnboarding = async () => {
     setOnboardingCompleted(true);
     try {
@@ -411,6 +470,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
         STORAGE_KEYS.PLANNER_QUESTIONS,
         STORAGE_KEYS.PRIVACY_CONSENT,
         STORAGE_KEYS.PRIVACY_CONSENT_DATE,
+        STORAGE_KEYS.VIDEO_WATCH_HISTORY,
+        STORAGE_KEYS.CACHED_VIDEOS,
       ]);
       setVisits([]);
       setChatMessages({});
@@ -418,6 +479,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setEducationChatMessages([]);
       setPrivacyConsentState(false);
       setPrivacyConsentDate(null);
+      setVideoWatchHistory([]);
+      setCachedVideosState([]);
       setLearningModules((prev) =>
         prev.map((module) => ({ ...module, progress: 0, completed: false }))
       );
@@ -440,7 +503,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadStoredData = async () => {
       try {
-        const [storedOnboarding, storedLevel, storedVisits, storedChatMessages, storedQuestions, storedConsent, storedConsentDate] =
+        const [storedOnboarding, storedLevel, storedVisits, storedChatMessages, storedQuestions, storedConsent, storedConsentDate, storedVideoHistory, storedCachedVideos] =
           await Promise.all([
             AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED),
             AsyncStorage.getItem(STORAGE_KEYS.READING_LEVEL),
@@ -449,6 +512,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
             AsyncStorage.getItem(STORAGE_KEYS.PLANNER_QUESTIONS),
             AsyncStorage.getItem(STORAGE_KEYS.PRIVACY_CONSENT),
             AsyncStorage.getItem(STORAGE_KEYS.PRIVACY_CONSENT_DATE),
+            AsyncStorage.getItem(STORAGE_KEYS.VIDEO_WATCH_HISTORY),
+            AsyncStorage.getItem(STORAGE_KEYS.CACHED_VIDEOS),
           ]);
 
         if (storedOnboarding === "true") {
@@ -491,6 +556,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
         if (storedQuestions) {
           setPlannerQuestions(JSON.parse(storedQuestions));
+        }
+
+        if (storedVideoHistory) {
+          const parsedHistory = JSON.parse(storedVideoHistory);
+          const historyWithDates = parsedHistory.map((record: any) => ({
+            ...record,
+            watchedAt: new Date(record.watchedAt),
+          }));
+          setVideoWatchHistory(historyWithDates);
+        }
+
+        if (storedCachedVideos) {
+          const parsedVideos = JSON.parse(storedCachedVideos);
+          const videosWithDates = parsedVideos.map((video: any) => ({
+            ...video,
+            cachedAt: new Date(video.cachedAt),
+          }));
+          setCachedVideosState(videosWithDates);
         }
       } catch (error) {
         console.error("Error loading stored data:", error);
@@ -542,6 +625,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
         completeModule,
         educationChatMessages,
         addEducationChatMessage,
+        videoWatchHistory,
+        addVideoWatchRecord,
+        getVideoWatchProgress,
+        cachedVideos,
+        setCachedVideos,
       }}
     >
       {children}

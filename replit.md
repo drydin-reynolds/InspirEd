@@ -62,6 +62,34 @@ The app allows users to record, pause, and stop audio, saving recordings locally
 ### Educational Content System
 Features learning modules categorized by topic and difficulty, with progress tracking. AI-generated lessons, dynamically created using the Gemini API, are adapted to the user's communication style and offer section-by-section navigation and module-specific Q&A. A separate education chat addresses broader medical questions, grounded in trusted PDF sources.
 
+### Educational Video System
+The app includes a curated video library for visual explanations of medical concepts:
+
+**Architecture:**
+- **Google Drive Service:** `utils/googleDrive.ts` handles authentication and video fetching from a designated Drive folder
+- **Video Library Screen:** `screens/VideoLibraryScreen.tsx` displays categorized videos with progress tracking
+- **Video Player Screen:** `screens/VideoPlayerScreen.tsx` provides full-screen playback using expo-av
+- **Watch History:** Persisted in AsyncStorage to track viewing progress
+
+**Configuration (Optional - Demo Mode Available):**
+To connect to Google Drive for real video content:
+1. Create a Google Cloud service account with Drive API access
+2. Share the video folder with the service account email
+3. Add `GOOGLE_SERVICE_ACCOUNT_JSON` secret with the service account credentials
+4. Add `GOOGLE_DRIVE_VIDEO_FOLDER_ID` environment variable with the folder ID
+
+**Video Naming Convention:**
+- Prefix with category: `[Surfactant Basics] What is Surfactant.mp4`
+- Or use file properties for metadata
+
+**Demo Mode:**
+When Google Drive is not configured, the app displays sample videos using public test content for development and demonstration purposes.
+
+**Platform Notes:**
+- Web: Full Google Drive integration supported with service account authentication
+- iOS/Android (Expo Go): Uses demo videos (JWT signing requires Web Crypto APIs not available in React Native)
+- For production native apps, consider moving Drive authentication to a cloud function
+
 ### Error Handling & Reliability
 The application includes an error boundary for graceful degradation, with a custom fallback UI and app restart functionality. Platform-specific fallbacks ensure consistent user experience across devices.
 

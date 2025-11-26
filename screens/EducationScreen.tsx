@@ -170,13 +170,23 @@ export default function EducationScreen() {
           </View>
         </ThemedView>
 
-        <Button
-          onPress={() => setShowChat(true)}
-          style={{ backgroundColor: theme.accent }}
-        >
-          <Icon name="chat" size={20} color="white" style={{ marginRight: Spacing.sm }} />
-          Ask AI Learning Assistant
-        </Button>
+        <View style={styles.actionButtons}>
+          <Button
+            onPress={() => navigation.navigate("VideoLibrary")}
+            style={{ flex: 1 }}
+          >
+            <Icon name="videocam" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            Watch Videos
+          </Button>
+
+          <Button
+            onPress={() => setShowChat(true)}
+            style={{ backgroundColor: theme.accent, flex: 1 }}
+          >
+            <Icon name="chat" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            Ask AI
+          </Button>
+        </View>
 
         {categories.map((category) => {
           const categoryModules = learningModules.filter((m) => m.category === category);
@@ -347,6 +357,10 @@ const styles = StyleSheet.create({
   container: {
     padding: Spacing.lg,
     gap: Spacing.lg,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    gap: Spacing.md,
   },
   progressCard: {
     padding: Spacing.xl,

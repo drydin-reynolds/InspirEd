@@ -3,14 +3,19 @@ import { Pressable, Platform } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import EducationScreen from "@/screens/EducationScreen";
 import ModuleDetailScreen from "@/screens/ModuleDetailScreen";
+import VideoLibraryScreen from "@/screens/VideoLibraryScreen";
+import VideoPlayerScreen from "@/screens/VideoPlayerScreen";
 import { getCommonScreenOptions } from "./screenOptions";
 import { useTheme } from "@/hooks/useTheme";
 import { Icon } from "@/components/Icon";
 import { Spacing } from "@/constants/theme";
+import { EducationalVideo } from "@/utils/googleDrive";
 
 export type EducationStackParamList = {
   Education: undefined;
   ModuleDetail: { moduleId: string };
+  VideoLibrary: undefined;
+  VideoPlayer: { videoId: string; video: EducationalVideo };
 };
 
 const Stack = createNativeStackNavigator<EducationStackParamList>();
@@ -42,6 +47,32 @@ export default function EducationStackNavigator() {
             </Pressable>
           ),
         })}
+      />
+      <Stack.Screen
+        name="VideoLibrary"
+        component={VideoLibraryScreen}
+        options={({ navigation }) => ({
+          title: "Educational Videos",
+          headerLeft: () => (
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={{
+                padding: Spacing.sm,
+                marginLeft: Platform.OS === "web" ? Spacing.sm : 0,
+              }}
+            >
+              <Icon name="chevron-back" size={24} color={theme.text} />
+            </Pressable>
+          ),
+        })}
+      />
+      <Stack.Screen
+        name="VideoPlayer"
+        component={VideoPlayerScreen}
+        options={{
+          headerShown: false,
+          animation: "fade",
+        }}
       />
     </Stack.Navigator>
   );
