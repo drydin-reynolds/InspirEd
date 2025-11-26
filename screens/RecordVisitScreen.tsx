@@ -158,11 +158,16 @@ export default function RecordVisitScreen() {
             style: "destructive",
             onPress: async () => {
               if (recording) {
-                await recording.stopAndUnloadAsync();
+                try {
+                  await recording.stopAndUnloadAsync();
+                } catch (error) {
+                  console.error("Error stopping recording:", error);
+                }
                 setRecording(null);
               }
               setIsRecording(false);
               setIsPaused(false);
+              setSeconds(0);
               navigation.goBack();
             },
           },
