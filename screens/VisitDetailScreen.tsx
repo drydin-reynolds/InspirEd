@@ -39,7 +39,7 @@ export default function VisitDetailScreen() {
             <ThemedText style={styles.cardTitle}>Recording</ThemedText>
           </View>
           <Button onPress={() => {}}>
-            <Icon name="play" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="play" size={20} color="white" />
             Play Recording
           </Button>
         </ThemedView>
@@ -106,7 +106,7 @@ export default function VisitDetailScreen() {
         )}
 
         <Button onPress={() => navigation.navigate("Chat", { visitId: visit.id })}>
-          <Icon name="chat" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+          <Icon name="chat" size={20} color="white" />
           Ask Questions About This Visit
         </Button>
       </View>

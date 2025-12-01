@@ -330,7 +330,7 @@ export default function ModuleDetailScreen() {
 
             {isSummary ? (
               <Button onPress={handleCompleteModule} style={{ flex: 1 }}>
-                <Icon name="check" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+                <Icon name="check" size={20} color="white" />
                 Complete Lesson
               </Button>
             ) : (
@@ -428,13 +428,13 @@ export default function ModuleDetailScreen() {
               Great work! You've mastered this topic. Tap below to review the lesson again.
             </ThemedText>
             <Button onPress={loadLesson} style={{ marginTop: Spacing.md }}>
-              <Icon name="refresh" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+              <Icon name="refresh" size={20} color="white" />
               Review Lesson
             </Button>
           </ThemedView>
         ) : (
           <Button onPress={loadLesson}>
-            <Icon name="play" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="play" size={20} color="white" />
             {module.progress > 0 ? "Continue Learning" : "Start Learning"}
           </Button>
         )}

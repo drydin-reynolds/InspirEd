@@ -168,7 +168,7 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
 
         {isAdmin && (
           <Button onPress={() => navigation.navigate("AdminSources")}>
-            <Icon name="document" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="document" size={20} color="white" />
             Manage Trusted Sources
           </Button>
         )}

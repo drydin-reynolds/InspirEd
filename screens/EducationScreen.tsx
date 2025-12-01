@@ -182,7 +182,7 @@ export default function EducationScreen() {
             onPress={() => navigation.navigate("VideoLibrary")}
             style={{ flex: 1 }}
           >
-            <Icon name="videocam" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="videocam" size={20} color="white" />
             Watch Videos
           </Button>
 
@@ -190,7 +190,7 @@ export default function EducationScreen() {
             onPress={() => setShowChat(true)}
             style={{ backgroundColor: theme.accent, flex: 1 }}
           >
-            <Icon name="chat" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="chat" size={20} color="white" />
             Ask AI
           </Button>
         </View>

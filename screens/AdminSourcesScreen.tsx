@@ -54,7 +54,7 @@ export default function AdminSourcesScreen() {
             Upload trusted medical PDFs to help the AI provide accurate, grounded answers.
           </ThemedText>
           <Button onPress={handleAddPDF}>
-            <Icon name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+            <Icon name="upload" size={20} color="white" />
             Add Trusted Source
           </Button>
         </View>
@@ -66,7 +66,7 @@ export default function AdminSourcesScreen() {
     <ScreenScrollView>
       <View style={styles.container}>
         <Button onPress={handleAddPDF}>
-          <Icon name="upload" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+          <Icon name="upload" size={20} color="white" />
           Add Trusted Source
         </Button>
 

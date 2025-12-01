@@ -86,10 +86,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: Spacing.xl,
+    flexDirection: "row",
+    gap: Spacing.sm,
   },
   buttonText: {
     fontWeight: "600",
     lineHeight: 24,
     textAlign: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: Spacing.sm,
   },
 });

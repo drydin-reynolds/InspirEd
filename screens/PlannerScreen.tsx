@@ -89,7 +89,7 @@ export default function PlannerScreen() {
         </ThemedView>
 
         <Button onPress={handleSuggestQuestions} disabled={isLoadingSuggestions || visits.length === 0}>
-          <Icon name="sparkles" size={20} color="white" style={{ marginRight: Spacing.sm }} />
+          <Icon name="sparkles" size={20} color="white" />
           {isLoadingSuggestions ? "Loading..." : visits.length === 0 ? "Suggest questions (record a visit first)" : "Suggest questions based on past visits"}
         </Button>
 
