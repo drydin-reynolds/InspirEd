@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { View, StyleSheet, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform } from "react-native";
+import React, { useState, useRef, useEffect } from "react";
+import { View, StyleSheet, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform, Keyboard } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Icon } from "@/components/Icon";
@@ -11,6 +11,8 @@ import { useRoute } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useHeaderHeight } from "@react-navigation/elements";
 import { askQuestionWithGemini } from "@/utils/gemini";
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from "react-native-reanimated";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 
 const TAB_BAR_HEIGHT = 80;
 
@@ -21,12 +23,27 @@ export default function ChatScreen() {
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const visitId = route.params?.visitId;
+  const flatListRef = useRef<FlatList>(null);
   
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   
   const messages = chatMessages[visitId] || [];
   const visit = visits.find((v) => v.id === visitId);
+  
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+  
+  const animatedInputStyle = useAnimatedStyle(() => {
+    return {
+      transform: [{ translateY: keyboardHeight.value }],
+    };
+  });
+  
+  const animatedListStyle = useAnimatedStyle(() => {
+    return {
+      paddingBottom: -keyboardHeight.value + TAB_BAR_HEIGHT + 70 + Spacing.lg,
+    };
+  });
 
   const handleSend = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -69,12 +86,9 @@ export default function ChatScreen() {
   const inputAreaHeight = 70 + TAB_BAR_HEIGHT;
 
   return (
-    <KeyboardAvoidingView 
-      style={[styles.container, { backgroundColor: theme.backgroundRoot }]}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={headerHeight}
-    >
-      <FlatList
+    <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
+      <Animated.FlatList
+        ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={[
@@ -85,6 +99,7 @@ export default function ChatScreen() {
             flexGrow: 1,
           },
         ]}
+        style={animatedListStyle}
         renderItem={({ item }) => (
           <MessageBubble message={item} isUser={item.isUser} theme={theme} />
         )}
@@ -95,9 +110,14 @@ export default function ChatScreen() {
             </ThemedText>
           </View>
         }
+        onContentSizeChange={() => {
+          if (messages.length > 0) {
+            flatListRef.current?.scrollToEnd({ animated: true });
+          }
+        }}
       />
 
-      <View
+      <Animated.View
         style={[
           styles.inputContainer,
           {
@@ -105,6 +125,7 @@ export default function ChatScreen() {
             bottom: TAB_BAR_HEIGHT,
             borderTopColor: theme.border,
           },
+          animatedInputStyle,
         ]}
       >
         <TextInput
@@ -138,8 +159,8 @@ export default function ChatScreen() {
             color={inputText.trim() && !isLoading ? "white" : theme.textSecondary}
           />
         </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+      </Animated.View>
+    </View>
   );
 }
 
