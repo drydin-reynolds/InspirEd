@@ -9,6 +9,7 @@ import { useAppContext, VideoWatchRecord } from "@/context/AppContext";
 import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { EducationalVideo, getVideoStreamUrl } from "@/utils/googleDrive";
+import { getLocalVideoSource } from "@/utils/videoAssets";
 import { Video, ResizeMode, AVPlaybackStatus } from "expo-av";
 
 type VideoPlayerParams = {
@@ -52,45 +53,64 @@ export default function VideoPlayerScreen() {
   const [position, setPosition] = useState(0);
   const [duration, setDuration] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [videoSource, setVideoSource] = useState<{ uri: string } | number | null>(null);
 
   const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const lastSaveRef = useRef<number>(0);
 
   useEffect(() => {
-    const loadVideoUrl = async () => {
+    const loadVideoSource = async () => {
       try {
-        let url = "";
+        console.log("[VideoPlayer] Loading source for:", video.id, "type:", embeddedSourceType, "isEmbedded:", isEmbeddedVideo);
+        
         if (isEmbeddedVideo) {
-          if (embeddedSourceType === "local" || embeddedSourceType === "url") {
-            url = video.videoUrl;
+          if (embeddedSourceType === "local") {
+            const localSource = getLocalVideoSource(video.id);
+            console.log("[VideoPlayer] Local source result:", localSource);
+            if (localSource !== null) {
+              setVideoSource(localSource);
+              return;
+            } else if (video.videoUrl && video.videoUrl.trim() !== "") {
+              setVideoSource({ uri: video.videoUrl });
+              return;
+            }
+          } else if (embeddedSourceType === "url") {
+            if (video.videoUrl && video.videoUrl.trim() !== "") {
+              setVideoSource({ uri: video.videoUrl });
+              return;
+            }
           } else if (embeddedSourceType === "drive") {
-            url = await getVideoStreamUrl(video.id) || video.videoUrl;
-          } else {
-            url = video.videoUrl;
+            const url = await getVideoStreamUrl(video.id) || video.videoUrl;
+            if (url && url.trim() !== "") {
+              setVideoSource({ uri: url });
+              return;
+            }
+          } else if (video.videoUrl && video.videoUrl.trim() !== "") {
+            setVideoSource({ uri: video.videoUrl });
+            return;
           }
         } else {
-          url = await getVideoStreamUrl(video.id) || video.videoUrl;
+          const url = await getVideoStreamUrl(video.id) || video.videoUrl;
+          if (url && url.trim() !== "") {
+            setVideoSource({ uri: url });
+            return;
+          }
         }
         
-        if (!url || url.trim() === "") {
-          setError("Video source is not available. Please try again later.");
-          setIsLoading(false);
-          return;
-        }
-        
-        setVideoUrl(url);
+        console.log("[VideoPlayer] No valid source found");
+        setError("Video source is not available. Please try again later.");
+        setIsLoading(false);
       } catch (err) {
-        console.error("Error getting video URL:", err);
+        console.error("[VideoPlayer] Error getting video source:", err);
         if (video.videoUrl && video.videoUrl.trim() !== "") {
-          setVideoUrl(video.videoUrl);
+          setVideoSource({ uri: video.videoUrl });
         } else {
           setError("Unable to load video. Please try again later.");
           setIsLoading(false);
         }
       }
     };
-    loadVideoUrl();
+    loadVideoSource();
   }, [video.id, video.videoUrl, isEmbeddedVideo, embeddedSourceType]);
 
   const saveProgress = useCallback(
@@ -248,10 +268,10 @@ export default function VideoPlayerScreen() {
   return (
     <View style={[styles.container, { backgroundColor: "#000" }]}>
       <Pressable onPress={handleVideoPress} style={styles.videoContainer}>
-        {videoUrl ? (
+        {videoSource ? (
           <Video
             ref={videoRef}
-            source={{ uri: videoUrl }}
+            source={videoSource}
             style={styles.video}
             resizeMode={ResizeMode.CONTAIN}
             shouldPlay={false}
