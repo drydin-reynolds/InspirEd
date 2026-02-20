@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Auth Page</title>
+
+<style>
+* { box-sizing: border-box; font-family: Arial, sans-serif; }
+
+body {
+    margin: 0;
+    background: #f4f4f4;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+.container {
+    width: 350px;
+    background: white;
+    padding: 30px;
+    border-radius: 12px;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.08);
+    text-align: center;
+}
+
+.logo {
+    margin-bottom: 20px;
+}
+
+.logo img {
+    width: 140px;
+    height: auto;
+    object-fit: contain;
+}
+
+input {
+    width: 100%;
+    padding: 10px;
+    margin: 8px 0;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+}
+
+button {
+    width: 100%;
+    padding: 10px;
+    margin-top: 10px;
+    border: none;
+    border-radius: 6px;
+    background: #3f8f8b;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:hover {
+    background: #367a76;
+}
+
+.link {
+    margin-top: 15px;
+    font-size: 14px;
+    cursor: pointer;
+    color: #3f8f8b;
+}
+
+.error {
+    color: #d9534f;
+    font-size: 13px;
+    margin-top: 5px;
+}
+
+.divider {
+    margin: 20px 0;
+    display: flex;
+    align-items: center;
+    text-align: center;
+}
+
+.divider::before,
+.divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 1px solid #ccc;
+}
+
+.divider span {
+    padding: 0 10px;
+    font-size: 14px;
+    color: #777;
+}
+
+.social {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.social button {
+    width: 45px;
+    height: 45px;
+    border-radius: 50%;
+    font-size: 18px;
+    background: #eee;
+    color: #555;
+}
+
+.hidden {
+    display: none;
+}
+
+fieldset {
+  border: none;
+  padding: 1rem 0;
+  border-bottom: 2px solid #424949;
+  text-align: left;
+}
+
+fieldset:last-of-type {
+  border-bottom: none;
+}
+
+.checkbox-group label {
+  display: block;
+  margin: 0.5rem 0;
+  text-align: left;
+}
+
+.checkbox-group input[type="checkbox"] {
+  width: unset;          /* overrides your global input width */
+  margin: 0 0.5em 0 0;
+  vertical-align: middle;
+}
+
+.inline {
+  width: unset;
+  margin: 0 0.5em 0 0;
+  vertical-align: middle;
+}
+</style>
+</head>
+<body>
+
+<div class="container">
+
+    <div class="logo">
+        <img src="../assets/images/inspired-logo.png" alt="Logo" />
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="loginForm">
+        <input type="text" id="loginUsername" placeholder="Username or Email" />
+        <input type="password" id="loginPassword" placeholder="Password" />
+        <button onclick="login()">Sign In</button>
+        <div id="loginError" class="error"></div>
+
+        <div class="link" onclick="showSignup()">New User? Get started here!</div>
+    </div>
+
+    <!-- SIGNUP FORM -->
+    <div id="signupForm" class="hidden">
+        <input type="text" id="signupUsername" placeholder="Username" />
+        <input type="email" id="signupEmail" placeholder="Email" />
+        <input type="password" id="signupPassword" placeholder="Password" />
+        <input type="password" id="signupConfirm" placeholder="Re-enter Password" />
+
+        <fieldset class="checkbox-group">
+            <label>
+                <input type="checkbox" id="terms" class="inline" />
+                I have read & agree to the terms
+            </label>
+
+            <label>
+                <input type="checkbox" id="subscribed" class="inline" />
+                I would like to get emails for any updates
+            </label>
+        </fieldset>
+
+        <button onclick="signup()">Sign Up</button>
+        <div id="signupError" class="error"></div>
+
+        <div class="link" onclick="showLogin()">Already have an account?</div>
+    </div>
+
+    <div class="divider"><span>or</span></div>
+
+    <div class="social">
+        <button title="Google">G</button>
+        <button title="Facebook">f</button>
+    </div>
+
+</div>
+
+<script>
+function showSignup() {
+    document.getElementById('loginForm').classList.add('hidden');
+    document.getElementById('signupForm').classList.remove('hidden');
+    clearErrors();
+}
+
+function showLogin() {
+    document.getElementById('signupForm').classList.add('hidden');
+    document.getElementById('loginForm').classList.remove('hidden');
+    clearErrors();
+}
+
+function clearErrors() {
+    document.getElementById('loginError').textContent = '';
+    document.getElementById('signupError').textContent = '';
+}
+
+function login() {
+    const user = document.getElementById('loginUsername').value.trim();
+    const pass = document.getElementById('loginPassword').value.trim();
+
+    if (!user || !pass) {
+        document.getElementById('loginError').textContent =
+            "Incorrect username or password. Please try again!";
+        return;
+    }
+
+    alert("Login successful (demo)");
+}
+
+function signup() {
+    const username = document.getElementById('signupUsername').value.trim();
+    const email = document.getElementById('signupEmail').value.trim();
+    const pass = document.getElementById('signupPassword').value.trim();
+    const confirm = document.getElementById('signupConfirm').value.trim();
+    const terms = document.getElementById('terms').checked;
+    const subscribed = document.getElementById('subscribed').checked;
+
+    if (!username || !email || !pass || !confirm) {
+        document.getElementById('signupError').textContent =
+            "Please fill in all fields.";
+        return;
+    }
+
+    const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailPattern.test(email)) {
+        error.textContent = "Please enter a valid email address.";
+        return;
+    }
+
+    if (pass !== confirm) {
+        document.getElementById('signupError').textContent =
+            "Passwords do not match.";
+        return;
+    }
+
+    if (!terms) {
+        document.getElementById('signupError').textContent =
+            "Please accept the terms.";
+        return;
+    }
+
+    alert("Signup successful (demo)");
+}
+</script>
+
+</body>
+</html>
