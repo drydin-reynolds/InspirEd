@@ -57,6 +57,8 @@ The app adapts content complexity based on your preference:
 
 The app uses Google’s Gemini API for transcription and AI-generated summaries.
 
+Use the following link to generate your own API key : https://aistudio.google.com/app/apikey 
+
 Because this project uses **Expo Go**, a simple `.env` file **will not work** during local development.  
 Instead, you must add your API key to **`app.json` → `expo.extra`**, or set an environment variable on your machine.
 
