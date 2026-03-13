@@ -1,0 +1,91 @@
+# Expo Go Error Documentation
+
+---
+
+## On History Page :
+**Error loading sound: [Error: An unknown error occurred (-17913) - The AVPlayerItem instance has failed with the error code -11800 and domain "AVFoundationErrorDomain".]**
+
+### Potential Causes
+- The audio file path or URI may be incorrect or unreachable.
+- The audio format may not be supported by iOS AVFoundation.
+- The file may be corrupted or not fully downloaded before playback.
+- Network-based audio files may fail due to unstable internet connection.
+- Permissions or sandbox restrictions when accessing local files in Expo Go.
+
+### Possible Solutions
+- Verify the audio file URI is correct and accessible.
+- Ensure the audio format is supported (e.g., `.mp3`, `.wav`, `.m4a`).
+- Confirm the file is fully loaded before attempting playback using `Audio.Sound.createAsync()` or proper loading checks.
+- If loading from a remote source, test the URL in a browser to confirm accessibility.
+- Add error handling around `expo-av` playback and verify the sound object is properly initialized before calling `playAsync()`.
+
+---
+
+## On Planner Page :
+**Failed to suggest planner questions: [ApiError: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]}}]**
+
+### Potential Causes
+- The Gemini API key is missing, invalid, or incorrectly copied.
+- The API key may not have access to the **Generative Language API**.
+- The API key may be restricted by domain, IP, or application restrictions in Google Cloud.
+- The environment variable containing the key may not be loading correctly in Expo.
+
+### Possible Solutions
+- Verify the API key in **Google Cloud Console** and ensure it is active.
+- Confirm that the **Generative Language API (Gemini)** is enabled for the project.
+- Check that the API key is correctly stored in environment variables (e.g., `.env`) and accessed properly in the app.
+- Remove or adjust API key restrictions if they block requests from Expo development environments.
+- Restart the Expo server after updating environment variables.
+
+---
+
+## On First Video :
+**Maximum update depth exceeded. This can happen when a component calls setState inside useEffect, but useEffect either doesn't have a dependency array, or one of the dependencies changes on every render.**
+
+### Potential Causes
+- A `useEffect()` hook triggers `setState()` without a dependency array.
+- A dependency in `useEffect` changes on every render (such as a newly created object, function, or array).
+- State updates cause a re-render that immediately triggers the same effect again.
+- Improper memoization of functions or values used in the dependency list.
+
+### Possible Solutions
+- Add a proper dependency array to `useEffect()` to control when it runs.
+- Memoize functions with `useCallback()` and values with `useMemo()` if they are dependencies.
+- Move state-setting logic outside of repeatedly triggered effects when possible.
+- Add conditional logic inside the effect to prevent repeated state updates.
+- Log dependency values to identify which one is triggering continuous renders.
+
+---
+
+## On Advanced Treatment Options Module :
+**[RAG] Error generating query embedding: [Error: Embedding API error: 400]**
+
+### Potential Causes
+- Invalid or missing API key when calling the embedding endpoint.
+- Incorrect request body format or unsupported model name.
+- The embedding model may not be enabled in the Google Cloud project.
+- Rate limiting or malformed request parameters.
+
+### Possible Solutions
+- Verify the API key is valid and authorized to access embedding models.
+- Confirm the correct embedding model name and API endpoint are being used.
+- Check the request payload structure matches the API documentation.
+- Inspect server logs or API responses for more detailed error information.
+- Ensure the Google Cloud project has the required APIs enabled.
+
+---
+
+**Gemini lesson generation error: {"error":{"code":400,"message":"API key not valid. Please pass a valid API key.","status":"INVALID_ARGUMENT","details":[{"@type":"type.googleapis.com/google.rpc.ErrorInfo","reason":"API_KEY_INVALID","domain":"googleapis.com","metadata":{"service":"generativelanguage.googleapis.com"}},{"@type":"type.googleapis.com/google.rpc.LocalizedMessage","locale":"en-US","message":"API key not valid. Please pass a valid API key."}]}}**
+
+### Potential Causes
+- The Gemini API key is invalid, expired, or incorrectly configured.
+- The API key is not authorized to access the **Generative Language API**.
+- Environment variables containing the key may not be loaded correctly in the development environment.
+- API key restrictions in Google Cloud may block requests from the current environment.
+
+### Possible Solutions
+- Generate or verify the API key in **Google Cloud Console**.
+- Ensure the **Generative Language API** is enabled for the project.
+- Confirm the API key is properly loaded in the application environment variables.
+- Check request headers to ensure the key is correctly passed in the API call.
+- Restart the development server after updating environment variables.
