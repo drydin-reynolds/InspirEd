@@ -1,0 +1,1560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Asset Library — Upload</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f4f5f7;
+      color: #1a1a2e;
+      min-height: 100vh;
+    }
+
+    .app { max-width: 780px; margin: 0 auto; padding: 32px 20px 80px; }
+
+    /* Progress bar */
+    .progress-wrap { margin-bottom: 32px; }
+    .progress-steps { display: flex; justify-content: space-between; margin-bottom: 8px; }
+    .progress-step {
+      font-size: 11px; font-weight: 600; color: #9ca3af;
+      text-transform: uppercase; letter-spacing: .5px;
+      cursor: pointer; transition: color .2s;
+    }
+    .progress-step.active  { color: #2563eb; }
+    .progress-step.done    { color: #16a34a; }
+    .progress-track { height: 4px; background: #e5e7eb; border-radius: 2px; }
+    .progress-fill  { height: 4px; background: #2563eb; border-radius: 2px; transition: width .4s; }
+
+    /* Card */
+    .card {
+      background: #fff; border-radius: 12px;
+      box-shadow: 0 1px 4px rgba(0,0,0,.08);
+      padding: 32px;
+    }
+    .card-header { margin-bottom: 28px; }
+    .card-header h2 { font-size: 20px; font-weight: 600; }
+    .card-header p  { font-size: 14px; color: #6b7280; margin-top: 4px; }
+
+    /* Warning banner */
+    .banner-warning {
+      background: #fef3c7; border: 1px solid #f59e0b;
+      border-radius: 8px; padding: 14px 16px;
+      font-size: 13px; color: #92400e;
+      margin-bottom: 24px; line-height: 1.5;
+    }
+    .banner-warning strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+    /* Field groups */
+    .field { margin-bottom: 22px; }
+    .field-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .field-row .field { margin-bottom: 0; }
+
+    label {
+      display: block; font-size: 13px; font-weight: 600;
+      color: #374151; margin-bottom: 5px;
+    }
+    label .req { color: #ef4444; margin-left: 2px; }
+    label .badge {
+      font-size: 10px; font-weight: 600; padding: 1px 6px;
+      border-radius: 10px; margin-left: 6px; vertical-align: middle;
+    }
+    .badge-auto { background: #dbeafe; color: #1d4ed8; }
+    .badge-cond { background: #fce7f3; color: #9d174d; }
+
+    .helper { font-size: 12px; color: #6b7280; margin-top: 4px; line-height: 1.4; }
+
+    input[type=text], input[type=number], textarea, select {
+      width: 100%; padding: 9px 12px;
+      border: 1.5px solid #d1d5db; border-radius: 7px;
+      font-size: 14px; color: #111827;
+      background: #fff; transition: border-color .15s;
+      appearance: none;
+    }
+    input[type=text]:focus, input[type=number]:focus,
+    textarea:focus, select:focus {
+      outline: none; border-color: #2563eb;
+      box-shadow: 0 0 0 3px rgba(37,99,235,.1);
+    }
+    input.readonly {
+      background: #f9fafb; color: #6b7280;
+      border-style: dashed; cursor: not-allowed;
+    }
+    textarea { resize: vertical; min-height: 80px; }
+
+    /* File picker */
+    .file-area {
+      border: 2px dashed #d1d5db; border-radius: 8px;
+      padding: 24px; text-align: center; cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .file-area:hover { border-color: #2563eb; background: #eff6ff; }
+    .file-area input { display: none; }
+    .file-area .file-icon { font-size: 28px; margin-bottom: 6px; }
+    .file-area .file-label { font-size: 14px; color: #374151; font-weight: 500; }
+    .file-area .file-sub   { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+    .file-chosen { font-size: 13px; color: #16a34a; margin-top: 8px; font-weight: 500; }
+
+    /* Toggle */
+    .toggle-wrap { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+    .toggle {
+      position: relative; width: 42px; height: 24px;
+      background: #d1d5db; border-radius: 12px;
+      cursor: pointer; transition: background .2s; flex-shrink: 0;
+    }
+    .toggle.on { background: #2563eb; }
+    .toggle::after {
+      content: ''; position: absolute;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: #fff; top: 3px; left: 3px;
+      transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .toggle.on::after { transform: translateX(18px); }
+    .toggle-label { font-size: 14px; color: #374151; }
+
+    /* Chips / multi-select */
+    .chips-wrap {
+      display: flex; flex-wrap: wrap; gap: 8px;
+      padding: 8px; border: 1.5px solid #d1d5db;
+      border-radius: 7px; min-height: 44px;
+      background: #fff; cursor: default;
+    }
+    .chips-wrap:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+    .chip {
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 13px; cursor: pointer; user-select: none;
+      border: 1.5px solid #d1d5db; background: #f9fafb;
+      color: #374151; transition: all .15s;
+    }
+    .chip.selected {
+      background: #2563eb; border-color: #2563eb;
+      color: #fff; font-weight: 500;
+    }
+    .chip.warn.selected { background: #dc2626; border-color: #dc2626; }
+
+    /* Tag input */
+    .tag-input-wrap {
+      display: flex; flex-wrap: wrap; gap: 6px;
+      padding: 6px 8px; border: 1.5px solid #d1d5db;
+      border-radius: 7px; min-height: 44px;
+      background: #fff; align-items: center;
+      cursor: text;
+    }
+    .tag-input-wrap:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,.1); }
+    .tag {
+      display: flex; align-items: center; gap: 4px;
+      background: #eff6ff; border: 1px solid #bfdbfe;
+      color: #1d4ed8; border-radius: 4px;
+      padding: 2px 8px; font-size: 13px;
+    }
+    .tag.warn-tag {
+      background: #fef2f2; border-color: #fecaca; color: #991b1b;
+    }
+    .tag button {
+      background: none; border: none; cursor: pointer;
+      color: inherit; font-size: 14px; padding: 0;
+      line-height: 1; opacity: .7;
+    }
+    .tag button:hover { opacity: 1; }
+    .tag-input-wrap input {
+      border: none; outline: none; font-size: 13px;
+      padding: 2px 4px; flex: 1; min-width: 120px;
+      background: transparent; box-shadow: none;
+    }
+
+    /* Typeahead */
+    .typeahead-wrap { position: relative; }
+    .typeahead-results {
+      position: absolute; top: calc(100% + 4px); left: 0; right: 0;
+      background: #fff; border: 1.5px solid #d1d5db;
+      border-radius: 7px; box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      z-index: 100; max-height: 200px; overflow-y: auto;
+      display: none;
+    }
+    .typeahead-results.open { display: block; }
+    .typeahead-item {
+      padding: 9px 12px; font-size: 13px; cursor: pointer;
+      border-bottom: 1px solid #f3f4f6; color: #111827;
+    }
+    .typeahead-item:hover { background: #eff6ff; }
+    .typeahead-item:last-child { border-bottom: none; }
+    .typeahead-item small { color: #6b7280; margin-left: 6px; }
+    .selected-assets { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+
+    /* Checkboxes */
+    .checkbox-grid { display: flex; flex-direction: column; gap: 8px; }
+    .checkbox-item { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+    .checkbox-item input { width: 16px; height: 16px; margin-top: 2px; cursor: pointer; accent-color: #2563eb; }
+    .checkbox-item .cb-label { font-size: 14px; color: #374151; }
+    .checkbox-item .cb-desc  { font-size: 12px; color: #6b7280; }
+
+    /* Read-only display */
+    .read-only-display {
+      padding: 9px 12px; background: #f9fafb;
+      border: 1.5px dashed #d1d5db; border-radius: 7px;
+      font-size: 14px; color: #6b7280; min-height: 40px;
+      font-family: 'SF Mono', 'Fira Code', monospace; letter-spacing: .3px;
+    }
+
+    /* Validation messages */
+    .field-error { font-size: 12px; color: #dc2626; margin-top: 4px; display: none; }
+    .field-error.show { display: block; }
+    .field-warn  { font-size: 12px; color: #d97706; margin-top: 4px; display: none; }
+    .field-warn.show  { display: block; }
+
+    /* Alert */
+    .alert {
+      padding: 14px 16px; border-radius: 8px;
+      font-size: 13px; margin-bottom: 20px;
+      line-height: 1.5; display: none;
+    }
+    .alert.show { display: block; }
+    .alert-error   { background: #fef2f2; border: 1px solid #fecaca; color: #991b1b; }
+    .alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+
+    /* Review screen */
+    .review-section { margin-bottom: 24px; }
+    .review-section h3 {
+      font-size: 14px; font-weight: 600; color: #374151;
+      border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 12px;
+    }
+    .review-grid { display: grid; grid-template-columns: 200px 1fr; gap: 6px 16px; }
+    .review-key { font-size: 13px; color: #6b7280; font-weight: 500; }
+    .review-val { font-size: 13px; color: #111827; }
+    .review-warn {
+      background: #fffbeb; border: 1px solid #f59e0b;
+      border-radius: 6px; padding: 10px 12px;
+      font-size: 13px; color: #92400e; margin-bottom: 12px;
+    }
+
+    /* Navigation */
+    .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+    .btn {
+      padding: 10px 24px; border-radius: 8px; font-size: 14px;
+      font-weight: 600; cursor: pointer; border: none; transition: all .15s;
+    }
+    .btn-primary { background: #2563eb; color: #fff; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-secondary { background: #f3f4f6; color: #374151; border: 1.5px solid #e5e7eb; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-success { background: #16a34a; color: #fff; }
+    .btn-success:hover { background: #15803d; }
+    .btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Success screen */
+    .success-screen { text-align: center; padding: 40px 0; }
+    .success-screen .check { font-size: 56px; margin-bottom: 16px; }
+    .success-screen h2 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+    .success-screen p  { color: #6b7280; font-size: 15px; }
+    .success-screen .asset-id-display {
+      font-family: monospace; font-size: 20px; font-weight: 700;
+      color: #2563eb; background: #eff6ff;
+      padding: 10px 20px; border-radius: 8px;
+      display: inline-block; margin: 16px 0;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- Progress -->
+  <div class="progress-wrap">
+    <div class="progress-steps" id="progressSteps"></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+  </div>
+
+  <!-- Alert banner (cross-step errors) -->
+  <div class="alert alert-error" id="globalAlert"></div>
+
+  <!-- Steps container -->
+  <div id="stepsContainer"></div>
+
+</div>
+
+<script>
+// ─── State ───────────────────────────────────────────────────────────────────
+const state = {
+  currentStep: 0,
+  data: {},
+  allAssets: []   // for typeahead
+}
+
+// ─── Step definitions ─────────────────────────────────────────────────────────
+const STEPS = [
+  { id: 'basics',       label: 'Basics' },
+  { id: 'classify',     label: 'Classification' },
+  { id: 'pathway',      label: 'Pathway' },
+  { id: 'audience',     label: 'Audience' },
+  { id: 'adaptive',     label: 'Adaptive' },
+  { id: 'psychosocial', label: 'Psychosocial' },
+  { id: 'nlp',          label: 'NLP' },
+  { id: 'access',       label: 'Accessibility' },
+  { id: 'review',       label: 'Review' },
+]
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function el(id) { return document.getElementById(id) }
+
+function showAlert(msg) {
+  const a = el('globalAlert')
+  a.textContent = msg
+  a.classList.add('show')
+  a.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+}
+function hideAlert() { el('globalAlert').classList.remove('show') }
+
+function setToggle(id, val) {
+  const t = el('toggle_' + id)
+  if (!t) return
+  if (val) t.classList.add('on'); else t.classList.remove('on')
+  state.data[id] = val
+}
+
+function makeToggle(fieldId, required) {
+  const val = state.data[fieldId] ?? false
+  return `
+    <div class="toggle-wrap">
+      <div class="toggle ${val ? 'on' : ''}" id="toggle_${fieldId}"
+        onclick="toggleField('${fieldId}')"></div>
+      <span class="toggle-label" id="toggleLabel_${fieldId}">${val ? 'Yes' : 'No'}</span>
+    </div>`
+}
+
+function toggleField(id) {
+  const t = el('toggle_' + id)
+  const val = !t.classList.contains('on')
+  setToggle(id, val)
+  el('toggleLabel_' + id).textContent = val ? 'Yes' : 'No'
+  handleConditionals()
+}
+
+function makeChips(fieldId, options, warnValues = []) {
+  const selected = state.data[fieldId] || []
+  return `<div class="chips-wrap" id="chips_${fieldId}">
+    ${options.map(o => {
+      const isWarn = warnValues.includes(o.value || o)
+      const val = o.value || o
+      const label = o.label || o
+      const isSelected = selected.includes(val)
+      return `<div class="chip ${isSelected ? 'selected' : ''} ${isWarn && isSelected ? 'warn' : ''}"
+        data-val="${val}" onclick="toggleChip('${fieldId}', this, ${isWarn})">${label}</div>`
+    }).join('')}
+  </div>`
+}
+
+function toggleChip(fieldId, chipEl, isWarn) {
+  const val = chipEl.dataset.val
+  let arr = state.data[fieldId] || []
+  if (arr.includes(val)) {
+    arr = arr.filter(v => v !== val)
+    chipEl.classList.remove('selected', 'warn')
+  } else {
+    arr.push(val)
+    chipEl.classList.add('selected')
+    if (isWarn) chipEl.classList.add('warn')
+  }
+  state.data[fieldId] = arr
+  handleConditionals()
+  checkHighLoadWarning()
+}
+
+function makeTagInput(fieldId, placeholder, warnStyle = false) {
+  const tags = state.data[fieldId] || []
+  return `
+    <div class="tag-input-wrap" id="tagwrap_${fieldId}" onclick="el('taginput_${fieldId}').focus()">
+      <div id="tags_${fieldId}" style="display:contents">
+        ${tags.map(t => renderTag(fieldId, t, warnStyle)).join('')}
+      </div>
+      <input id="taginput_${fieldId}" type="text" placeholder="${placeholder}"
+        onkeydown="handleTagKey(event, '${fieldId}', ${warnStyle})">
+    </div>`
+}
+
+function renderTag(fieldId, val, warnStyle = false) {
+  return `<span class="tag ${warnStyle ? 'warn-tag' : ''}">${val}
+    <button type="button" onclick="removeTag('${fieldId}', '${val.replace(/'/g, "\\'")}')">×</button>
+  </span>`
+}
+
+function handleTagKey(e, fieldId, warnStyle) {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault()
+    const val = e.target.value.trim().replace(/,$/, '')
+    if (!val) return
+    let arr = state.data[fieldId] || []
+    if (!arr.includes(val)) {
+      arr.push(val)
+      state.data[fieldId] = arr
+      el('tags_' + fieldId).insertAdjacentHTML('beforeend', renderTag(fieldId, val, warnStyle))
+    }
+    e.target.value = ''
+  }
+}
+
+function removeTag(fieldId, val) {
+  state.data[fieldId] = (state.data[fieldId] || []).filter(v => v !== val)
+  renderStep(state.currentStep)
+}
+
+function makeTypeahead(fieldId, placeholder) {
+  const selected = state.data[fieldId] || []
+  return `
+    <div class="typeahead-wrap">
+      <input type="text" id="tainput_${fieldId}" placeholder="${placeholder}"
+        oninput="searchAssets('${fieldId}', this.value)"
+        onfocus="searchAssets('${fieldId}', this.value)"
+        onblur="setTimeout(() => closeTypeahead('${fieldId}'), 200)">
+      <div class="typeahead-results" id="taresults_${fieldId}"></div>
+    </div>
+    <div class="selected-assets" id="taselected_${fieldId}">
+      ${selected.map(id => {
+        const a = state.allAssets.find(x => x._id === id)
+        return a ? renderTag(fieldId, a.title || a.asset_id) : ''
+      }).join('')}
+    </div>`
+}
+
+function searchAssets(fieldId, query) {
+  const res = el('taresults_' + fieldId)
+  const filtered = state.allAssets.filter(a =>
+    !query ||
+    (a.title && a.title.toLowerCase().includes(query.toLowerCase())) ||
+    (a.asset_id && a.asset_id.toLowerCase().includes(query.toLowerCase()))
+  ).slice(0, 8)
+
+  if (!filtered.length) { res.classList.remove('open'); return }
+  res.innerHTML = filtered.map(a =>
+    `<div class="typeahead-item" onmousedown="selectAsset('${fieldId}', '${a._id}', '${(a.title || a.asset_id).replace(/'/g, "\\'")}')">
+      ${a.title || '(no title)'} <small>${a.asset_id || ''}</small>
+    </div>`
+  ).join('')
+  res.classList.add('open')
+}
+
+function selectAsset(fieldId, id, title) {
+  let arr = state.data[fieldId] || []
+  if (!arr.includes(id)) {
+    arr.push(id)
+    state.data[fieldId] = arr
+    const wrap = el('taselected_' + fieldId)
+    wrap.insertAdjacentHTML('beforeend', renderTag(fieldId, title))
+  }
+  el('tainput_' + fieldId).value = ''
+  closeTypeahead(fieldId)
+}
+
+function closeTypeahead(fieldId) {
+  const r = el('taresults_' + fieldId)
+  if (r) r.classList.remove('open')
+}
+
+function checkboxGrid(fieldId, options) {
+  const selected = state.data[fieldId] || []
+  return `<div class="checkbox-grid">
+    ${options.map(o => `
+      <label class="checkbox-item">
+        <input type="checkbox" value="${o.value}" ${selected.includes(o.value) ? 'checked' : ''}
+          onchange="toggleCheckbox('${fieldId}', '${o.value}', this.checked)">
+        <div>
+          <div class="cb-label">${o.label}</div>
+          ${o.desc ? `<div class="cb-desc">${o.desc}</div>` : ''}
+        </div>
+      </label>`).join('')}
+  </div>`
+}
+
+function toggleCheckbox(fieldId, val, checked) {
+  let arr = state.data[fieldId] || []
+  if (checked) { if (!arr.includes(val)) arr.push(val) }
+  else { arr = arr.filter(v => v !== val) }
+  state.data[fieldId] = arr
+  handleConditionals()
+}
+
+function getVal(fieldId) {
+  const el2 = document.querySelector(`[name="${fieldId}"]`)
+  return el2 ? el2.value : (state.data[fieldId] ?? '')
+}
+
+function saveInputs() {
+  document.querySelectorAll('input[name], select[name], textarea[name]').forEach(el2 => {
+    if (el2.type === 'checkbox') return
+    state.data[el2.name] = el2.value
+  })
+}
+
+// ─── Conditional visibility ───────────────────────────────────────────────────
+function handleConditionals() {
+  saveInputs()
+  const ct = state.data.content_type || ''
+
+  // Closed captions — only for video/audio types
+  const ccRow = el('row_closed_captions')
+  if (ccRow) {
+    const show = ['video_segment','animation','procedural_demo'].includes(ct)
+    ccRow.classList.toggle('hidden', !show)
+  }
+
+  // Alt text — only for visual types
+  const altRow = el('row_alt_text')
+  if (altRow) {
+    const show = ['diagram','animation'].includes(ct)
+    altRow.classList.toggle('hidden', !show)
+  }
+
+  // Prerequisite search — only if can_stand_alone = false
+  const prereqRow = el('row_prerequisite')
+  if (prereqRow) {
+    const show = state.data.can_stand_alone === false
+    prereqRow.classList.toggle('hidden', !show)
+  }
+
+  // asset_id preview
+  updateAssetIdPreview()
+}
+
+function updateAssetIdPreview() {
+  const preview = el('asset_id_preview')
+  if (!preview) return
+  const abbrev = {
+    animation:'ANI', video_segment:'VID', diagram:'DIA',
+    text_explanation:'TXT', analogy:'ANA', glossary_entry:'GLS',
+    case_example:'CAS', procedural_demo:'PRO'
+  }
+  const ct  = state.data.content_type || ''
+  const mod = state.data.module_id || ''
+  const les = (state.data.lesson_id || '').replace('.','')
+  if (ct && mod && les) {
+    const type = abbrev[ct] || '???'
+    preview.textContent = `${type}_M${String(mod).padStart(2,'0')}_L${les}_NNN`
+  } else {
+    preview.textContent = 'Fill in module, lesson and content type above'
+  }
+}
+
+function checkHighLoadWarning() {
+  const warn = el('highLoadWarn')
+  if (!warn) return
+  const load   = state.data.cognitive_load_rating
+  const states = state.data.stress_state_compatibility || []
+  const bad    = states.some(s => ['acute_crisis','post_bad_news'].includes(s))
+  if (load === 'high' && bad) {
+    warn.classList.add('show')
+  } else {
+    warn.classList.remove('show')
+  }
+}
+
+// ─── Step renderers ───────────────────────────────────────────────────────────
+function renderStep(idx) {
+  const container = el('stepsContainer')
+  const renderers = [
+    renderStep1, renderStep2, renderStep3, renderStep4,
+    renderStep5, renderStep6, renderStep7, renderStep8, renderReview
+  ]
+  container.innerHTML = renderers[idx]()
+  handleConditionals()
+  updateProgress()
+}
+
+function field(id, label, control, helper='', required=false, badge='', errorMsg='', warnMsg='') {
+  return `
+    <div class="field" id="row_${id}">
+      <label for="${id}">${label}
+        ${required ? '<span class="req">*</span>' : ''}
+        ${badge ? `<span class="badge badge-${badge}">${badge}</span>` : ''}
+      </label>
+      ${control}
+      ${helper ? `<div class="helper">${helper}</div>` : ''}
+      ${errorMsg ? `<div class="field-error" id="err_${id}">${errorMsg}</div>` : ''}
+      ${warnMsg  ? `<div class="field-warn"  id="wrn_${id}">${warnMsg}</div>`  : ''}
+    </div>`
+}
+
+function renderStep1() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 1 — File Upload &amp; Basics</h2>
+      <p>Core identification fields for this learning asset.</p>
+    </div>
+
+    ${field('file_upload', 'File', `
+      <div class="file-area" onclick="el('fileInput').click()">
+        <input type="file" id="fileInput" accept=".mp4,.mov,.png,.jpg,.jpeg,.pdf,.txt,.html"
+          onchange="handleFileSelect(this)">
+        <div class="file-icon">📁</div>
+        <div class="file-label">Click to choose a file</div>
+        <div class="file-sub">.mp4 .mov .png .jpg .pdf .txt .html</div>
+        <div class="file-chosen hidden" id="fileChosen"></div>
+      </div>`, 'File will be stored locally. Sets file_path on success.', true)}
+
+    ${field('asset_id', 'Asset ID', `
+      <div class="read-only-display" id="asset_id_preview">
+        Fill in module, lesson and content type above
+      </div>`, 'Auto-generated after module, lesson and content type are entered.', false, 'auto')}
+
+    ${field('title', 'Title',
+      `<input type="text" name="title" maxlength="200" value="${state.data.title||''}"
+        oninput="saveInputs()">`,
+      'Describe the specific teaching point, not just the topic. Max 200 characters.', true,
+      '', 'Title is required.')}
+
+    <div class="field-row">
+      ${field('module_id', 'Module ID',
+        `<input type="number" name="module_id" min="1" max="99" value="${state.data.module_id||''}"
+          oninput="saveInputs(); updateAssetIdPreview()">`,
+        'Integer 1–99', true, '', 'Module ID is required.')}
+      ${field('lesson_id', 'Lesson ID',
+        `<input type="text" name="lesson_id" placeholder="e.g. 1.3" value="${state.data.lesson_id||''}"
+          oninput="saveInputs(); updateAssetIdPreview()">`,
+        'Format: M.L e.g. 1.3', true, '', 'Lesson ID is required.')}
+    </div>
+
+    ${field('content_type', 'Content Type', `
+      <select name="content_type" onchange="saveInputs(); handleConditionals()">
+        <option value="">— select —</option>
+        ${['animation','video_segment','diagram','text_explanation','analogy',
+           'glossary_entry','case_example','procedural_demo'].map(v =>
+          `<option value="${v}" ${state.data.content_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, 'Select the format of this learning object.', true)}
+
+    ${field('author_source', 'Author / Source',
+      `<input type="text" name="author_source" value="${state.data.author_source||''}"
+        oninput="saveInputs()">`,
+      'Who created or clinically reviewed this content?', true)}
+
+    ${field('version', 'Version',
+      `<input type="text" name="version" value="${state.data.version||'v1.0'}"
+        oninput="saveInputs()">`,
+      'Leave as v1.0 for new content.', true)}
+
+    ${field('clinical_reviewed', 'Clinically Reviewed',
+      makeToggle('clinical_reviewed'),
+      'Has a chILD physician reviewed this content for accuracy?', true)}
+
+    ${field('plain_language_version', 'Plain Language Version',
+      makeToggle('plain_language_version'),
+      'Has a simplified-language version been created?', true)}
+
+    ${field('language_versions', 'Language Versions',
+      makeChips('language_versions', [
+        {value:'en',label:'English'},{value:'es',label:'Spanish'},
+        {value:'fr',label:'French'},{value:'pt',label:'Portuguese'},
+        {value:'zh',label:'Chinese'},{value:'other',label:'Other'}
+      ]), 'Default: English. Select all that apply.', true)}
+
+    <div class="nav">
+      <div></div>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep2() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 2 — Content Classification</h2>
+      <p>Tag the knowledge domain and concepts covered by this asset.</p>
+    </div>
+
+    ${field('disease_relevance_tags', 'Disease Relevance',
+      makeChips('disease_relevance_tags', [
+        {value:'SFTPC mutation',label:'SFTPC mutation'},
+        {value:'SFTPB deficiency',label:'SFTPB deficiency'},
+        {value:'ABCA3 deficiency',label:'ABCA3 deficiency'},
+        {value:'general chILD',label:'General chILD'}
+      ]), 'Select all diagnoses this content is relevant to.', true,
+      '', 'At least one diagnosis tag is required.')}
+
+    ${field('concept_domain', 'Concept Domain', `
+      <select name="concept_domain" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['lung_biology','genetics','treatment','diagnosis','home_care','psychosocial'].map(v =>
+          `<option value="${v}" ${state.data.concept_domain===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, 'What broad knowledge area does this content cover?', true)}
+
+    ${field('primary_concept', 'Primary Concept',
+      `<input type="text" name="primary_concept" value="${state.data.primary_concept||''}"
+        placeholder="e.g. pulmonary surfactant" oninput="saveInputs()">`,
+      'The single core concept this object teaches.', true)}
+
+    ${field('secondary_concepts', 'Secondary Concepts',
+      makeTagInput('secondary_concepts', 'Type and press Enter…'),
+      'Supporting concepts explained in this object.', true)}
+
+    ${field('explains_symptom', 'Explains Symptom',
+      makeTagInput('explains_symptom', 'e.g. rapid breathing — press Enter…'),
+      'Use the words parents use, not clinical terms.')}
+
+    ${field('explains_procedure', 'Explains Procedure',
+      makeTagInput('explains_procedure', 'e.g. pulse oximetry monitoring — press Enter…'),
+      'Procedures this content helps parents understand.')}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep3() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 3 — Learning Pathway</h2>
+      <p>Define where this asset sits in the instructional sequence.</p>
+    </div>
+
+    ${field('explanation_role', 'Explanation Role', `
+      <select name="explanation_role" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up'].map(v =>
+          `<option value="${v}" ${state.data.explanation_role===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, 'Where does this object fit in a teaching sequence?', true)}
+
+    ${field('sequence_position', 'Sequence Position',
+      `<input type="number" name="sequence_position" min="1" value="${state.data.sequence_position||''}"
+        oninput="saveInputs()">`,
+      'Position in the concept sequence. 1 = first.', true)}
+
+    ${field('learning_objective', 'Learning Objective',
+      `<input type="text" name="learning_objective" value="${state.data.learning_objective||''}"
+        placeholder="e.g. Explain how surfactant reduces surface tension…" oninput="saveInputs()">`,
+      "Single sentence starting with a Bloom's verb.", true,
+      '', '', "Learning objectives should start with an action verb (e.g. 'Explain', 'Identify', 'Describe').")}
+
+    ${field('bloom_level', 'Bloom\'s Level', `
+      <select name="bloom_level" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${[
+          {v:'remember',d:'Recall facts'},
+          {v:'understand',d:'Explain in own words'},
+          {v:'apply',d:'Use in a new situation'},
+          {v:'analyze',d:'Break down components'},
+          {v:'evaluate',d:'Make judgements'},
+          {v:'create',d:'Produce something new'}
+        ].map(o => `<option value="${o.v}" ${state.data.bloom_level===o.v?'selected':''}>${o.v} — ${o.d}</option>`).join('')}
+      </select>`, "Select the cognitive level this content targets.", true)}
+
+    ${field('object_granularity', 'Object Granularity', `
+      <select name="object_granularity" onchange="saveInputs()">
+        <option value="">— select —</option>
+        <option value="micro"  ${state.data.object_granularity==='micro' ?'selected':''}>Micro — single fact</option>
+        <option value="meso"   ${state.data.object_granularity==='meso'  ?'selected':''}>Meso — single concept</option>
+        <option value="macro"  ${state.data.object_granularity==='macro' ?'selected':''}>Macro — concept cluster</option>
+      </select>`, 'How much does this object cover?', true)}
+
+    ${field('can_stand_alone', 'Can Stand Alone',
+      makeToggle('can_stand_alone'),
+      'Can a parent understand this without seeing prior content?', true)}
+
+    <div class="field hidden" id="row_prerequisite">
+      <label>Prerequisite Assets <span class="req">*</span></label>
+      ${makeTypeahead('prerequisite_concept_ids', 'Search by title or asset ID…')}
+      <div class="helper">Required because "can stand alone" is off.</div>
+      <div class="field-error" id="err_prerequisite_concept_ids">
+        Please add at least one prerequisite asset.
+      </div>
+    </div>
+
+    ${field('next_concept_ids', 'Next Concept Assets',
+      makeTypeahead('next_concept_ids', 'Search by title or asset ID…'),
+      'What content logically follows this?')}
+
+    ${field('instructional_strategy', 'Instructional Strategy',
+      checkboxGrid('instructional_strategy', [
+        {value:'segmenting',         label:'Segmenting',          desc:'Break content into learnable chunks'},
+        {value:'spatial_contiguity', label:'Spatial contiguity',  desc:'Place related items near each other'},
+        {value:'personalization',    label:'Personalization',      desc:'Use conversational language'},
+        {value:'modality',           label:'Modality',             desc:'Use audio + visuals together'},
+        {value:'coherence',          label:'Coherence',            desc:'Remove irrelevant material'},
+        {value:'signaling',          label:'Signaling',            desc:'Highlight key information'}
+      ]), 'Which CTML principles were applied?')}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep4() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 4 — Audience &amp; Literacy</h2>
+      <p>Define who this content is for and how accessible it is.</p>
+    </div>
+
+    ${field('target_audience', 'Target Audience',
+      checkboxGrid('target_audience', [
+        {value:'caregiver_parent', label:'Caregiver / Parent'},
+        {value:'teen_patient',     label:'Teen patient'},
+        {value:'adult_patient',    label:'Adult patient'},
+        {value:'extended_family',  label:'Extended family'},
+        {value:'school_staff',     label:'School staff'}
+      ]), 'Who is the primary intended audience? Select all that apply.', true,
+      '', 'At least one audience type is required.')}
+
+    ${field('health_literacy_level', 'Health Literacy Level', `
+      <select name="health_literacy_level" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${[
+          {v:'foundational', d:'Very basic reading and health knowledge'},
+          {v:'functional',   d:'Reads and acts on health info'},
+          {v:'interactive',  d:'Can extract and apply complex info'},
+          {v:'critical',     d:'Can critically analyse health info'},
+          {v:'contributory', d:'Contributes to the knowledge base'}
+        ].map(o => `<option value="${o.v}" ${state.data.health_literacy_level===o.v?'selected':''}>${o.v} — ${o.d}</option>`).join('')}
+      </select>`, '', true)}
+
+    ${field('medical_terminology_level', 'Medical Terminology Level', `
+      <select name="medical_terminology_level" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['none','minimal','moderate','clinical'].map(v =>
+          `<option value="${v}" ${state.data.medical_terminology_level===v?'selected':''}>${v}</option>`
+        ).join('')}
+      </select>`, 'How much clinical language is used?', true)}
+
+    ${field('reading_level_grade', 'Reading Level (Grade)',
+      `<input type="number" name="reading_level_grade" min="1" max="16"
+        value="${state.data.reading_level_grade||''}" oninput="saveInputs()">`,
+      'Estimated reading grade level 1–16. Leave blank if not calculated.')}
+
+    ${field('modality_type', 'Modality Type', `
+      <select name="modality_type" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['visual_only','audio_only','audio_visual','text_only','interactive'].map(v =>
+          `<option value="${v}" ${state.data.modality_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, 'What sensory channels does this content use?', true)}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep5() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 5 — Adaptive Delivery</h2>
+    </div>
+
+    <div class="banner-warning">
+      <strong>⚠️ Important — Read Before Tagging</strong>
+      This step determines WHEN the system will show this content to families.
+      Incorrect tagging here can result in the wrong content shown at the wrong moment.
+      When in doubt, be conservative — tag fewer states rather than more.
+    </div>
+
+    <div class="alert alert-warning" id="highLoadWarn">
+      ⚠️ <strong>High cognitive load + acute stress state detected.</strong>
+      High cognitive load content is not recommended for acute crisis delivery.
+      Please review your selections before continuing.
+    </div>
+
+    ${field('stress_state_compatibility', 'Stress State Compatibility',
+      makeChips('stress_state_compatibility', [
+        {value:'baseline_calm',        label:'Baseline calm'},
+        {value:'mild_concern',         label:'Mild concern'},
+        {value:'moderate_stress',      label:'Moderate stress'},
+        {value:'acute_crisis',         label:'Acute crisis'},
+        {value:'post_bad_news',        label:'Post bad news'},
+        {value:'post_hospitalization', label:'Post hospitalization'}
+      ], ['acute_crisis','post_bad_news']),
+      'Select all stress states where it is appropriate to show this content.', true,
+      '', 'At least one stress state is required.')}
+
+    ${field('parent_expertise_stage', 'Parent Expertise Stage',
+      makeChips('parent_expertise_stage', [
+        {value:'novice',            label:'Novice'},
+        {value:'emerging',          label:'Emerging'},
+        {value:'developing',        label:'Developing'},
+        {value:'proficient',        label:'Proficient'},
+        {value:'expert_contributor',label:'Expert contributor'}
+      ]), 'Select all expertise stages this content is appropriate for.', true,
+      '', 'At least one expertise stage is required.')}
+
+    ${field('care_journey_stage', 'Care Journey Stage',
+      makeChips('care_journey_stage', [
+        {value:'pre_diagnosis',      label:'Pre-diagnosis'},
+        {value:'diagnosis',          label:'Diagnosis'},
+        {value:'acute_management',   label:'Acute management'},
+        {value:'home_management',    label:'Home management'},
+        {value:'advanced_planning',  label:'Advanced planning'}
+      ]), 'Select all care journey stages where this content applies.', true,
+      '', 'At least one care journey stage is required.')}
+
+    ${field('cognitive_load_rating', 'Cognitive Load Rating', `
+      <select name="cognitive_load_rating" onchange="saveInputs(); checkHighLoadWarning()">
+        <option value="">— select —</option>
+        <option value="low"    ${state.data.cognitive_load_rating==='low'   ?'selected':''}>Low — 1 concept</option>
+        <option value="medium" ${state.data.cognitive_load_rating==='medium'?'selected':''}>Medium — 2–3 concepts</option>
+        <option value="high"   ${state.data.cognitive_load_rating==='high'  ?'selected':''}>High — 4+ interacting concepts</option>
+      </select>`, '', true)}
+
+    ${field('element_interactivity', 'Element Interactivity', `
+      <select name="element_interactivity" onchange="saveInputs()">
+        <option value="">— select —</option>
+        <option value="low"    ${state.data.element_interactivity==='low'   ?'selected':''}>Low — 1–2 elements</option>
+        <option value="medium" ${state.data.element_interactivity==='medium'?'selected':''}>Medium — 3–4 elements</option>
+        <option value="high"   ${state.data.element_interactivity==='high'  ?'selected':''}>High — 5+ elements</option>
+      </select>`, '', true)}
+
+    ${field('appropriate_after_event', 'Appropriate After Event',
+      makeTagInput('appropriate_after_event', 'e.g. initial_diagnosis_appointment — press Enter…'),
+      'Events after which it is appropriate to show this content.')}
+
+    ${field('contraindicated_after_event', 'Contraindicated After Event',
+      makeTagInput('contraindicated_after_event', 'e.g. acute_hospitalization — press Enter…', true),
+      'Events after which this content should NOT be shown.')}
+
+    ${field('just_in_time_trigger', 'Just-in-Time Trigger',
+      `<input type="text" name="just_in_time_trigger" value="${state.data.just_in_time_trigger||''}"
+        oninput="saveInputs()">`, '')}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep6() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 6 — Psychosocial Context</h2>
+      <p>Describe the emotional framing of this content.</p>
+    </div>
+
+    ${field('emotional_tone', 'Emotional Tone', `
+      <select name="emotional_tone" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['reassuring','matter_of_fact','empowering','cautionary','validating'].map(v =>
+          `<option value="${v}" ${state.data.emotional_tone===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, '', true)}
+
+    ${field('emotional_sensitivity_level', 'Emotional Sensitivity Level', `
+      <select name="emotional_sensitivity_level" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['low','medium','high','critical'].map(v =>
+          `<option value="${v}" ${state.data.emotional_sensitivity_level===v?'selected':''}>${v}</option>`
+        ).join('')}
+      </select>`, '', true)}
+
+    ${field('includes_reassurance', 'Includes Reassurance',
+      makeToggle('includes_reassurance'), '', true)}
+
+    ${field('addresses_guilt_or_blame', 'Addresses Guilt or Blame',
+      makeToggle('addresses_guilt_or_blame'), '', true)}
+
+    ${field('decision_support_context', 'Decision Support Context',
+      makeToggle('decision_support_context'), '', true)}
+
+    ${field('isolation_acknowledgment', 'Isolation Acknowledgment',
+      makeToggle('isolation_acknowledgment'), '', true)}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep7() {
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 7 — NLP &amp; Searchability</h2>
+      <p>These fields help the AI match a parent's question to the right content. Pull from focus group data and parent surveys wherever possible.</p>
+    </div>
+
+    ${field('parent_question_patterns', 'Parent Question Patterns',
+      makeTagInput('parent_question_patterns', 'Full sentence — e.g. Why does my child need oxygen? — press Enter…'),
+      'Enter full sentences parents might ask. Minimum 2 required.', true,
+      '', 'Please add at least 2 parent question patterns.')}
+
+    ${field('query_synonyms', 'Query Synonyms',
+      makeTagInput('query_synonyms', 'e.g. SATS, oxygen levels — press Enter…'),
+      'Alternate terms or abbreviations parents might use.')}
+
+    ${field('intent_type', 'Intent Type', `
+      <select name="intent_type" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['explain','reassure','define','compare','decide','procedure_how_to','prognosis'].map(v =>
+          `<option value="${v}" ${state.data.intent_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, '', true)}
+
+    ${field('response_type', 'Response Type', `
+      <select name="response_type" onchange="saveInputs()">
+        <option value="">— select —</option>
+        ${['explanation','definition','analogy','reassurance','decision_support','step_by_step'].map(v =>
+          `<option value="${v}" ${state.data.response_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
+        ).join('')}
+      </select>`, '', true)}
+
+    ${field('keyword_triggers', 'Keyword Triggers',
+      makeTagInput('keyword_triggers', 'Single word or short phrase — press Enter…'),
+      'Single words or short phrases that should surface this content. Minimum 3 required.', true,
+      '', 'Please add at least 3 keyword triggers.')}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Next →</button>
+    </div>
+  </div>`
+}
+
+function renderStep8() {
+  const ct = state.data.content_type || ''
+  const needsCaptions = ['video_segment','animation','procedural_demo'].includes(ct)
+  const needsAlt      = ['diagram','animation'].includes(ct)
+
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Step 8 — Accessibility</h2>
+      <p>Ensure this content is accessible to all users.</p>
+    </div>
+
+    <div class="field ${needsCaptions ? '' : 'hidden'}" id="row_closed_captions">
+      <label>Closed Captions <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      ${makeToggle('closed_captions')}
+      <div class="helper">Required for video, animation and procedural demo content.</div>
+    </div>
+
+    <div class="field ${needsAlt ? '' : 'hidden'}" id="row_alt_text">
+      <label>Alt Text <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      <textarea name="alt_text" maxlength="500" oninput="saveInputs()">${state.data.alt_text||''}</textarea>
+      <div class="helper">Required for diagram and animation content. Max 500 characters.</div>
+      <div class="field-error" id="err_alt_text">Alt text is required for this content type.</div>
+    </div>
+
+    ${field('audio_narration', 'Audio Narration Available',
+      makeToggle('audio_narration'), 'Is an audio version available?', true)}
+
+    ${field('screen_reader_compatible', 'Screen Reader Compatible',
+      makeToggle('screen_reader_compatible'),
+      'Are all interactive elements labeled for screen readers?', true)}
+
+    ${field('mobile_optimized', 'Mobile Optimized',
+      makeToggle('mobile_optimized'),
+      'Is this designed for a mobile viewport?', true)}
+
+    ${field('transcript_file', 'Transcript File', `
+      <div class="file-area" onclick="el('transcriptInput').click()">
+        <input type="file" id="transcriptInput" accept=".txt,.vtt,.srt"
+          onchange="handleTranscriptSelect(this)">
+        <div class="file-label">Click to choose a transcript</div>
+        <div class="file-sub">.txt .vtt .srt</div>
+        <div class="file-chosen hidden" id="transcriptChosen"></div>
+      </div>`, 'Optional. Processed separately by the ingest pipeline after submission.')}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-primary" onclick="nextStep()">Review →</button>
+    </div>
+  </div>`
+}
+
+function renderReview() {
+  saveInputs()
+  const d = state.data
+
+  const load  = d.cognitive_load_rating
+  const stress = d.stress_state_compatibility || []
+  const highLoadWarn = load === 'high' && stress.some(s => ['acute_crisis','post_bad_news'].includes(s))
+
+  function row(key, val) {
+    if (!val || (Array.isArray(val) && !val.length)) return ''
+    const display = Array.isArray(val) ? val.join(', ') : val
+    return `<div class="review-key">${key}</div><div class="review-val">${display}</div>`
+  }
+
+  function section(title, rows) {
+    const content = rows.filter(Boolean).join('')
+    if (!content) return ''
+    return `<div class="review-section">
+      <h3>${title}</h3>
+      <div class="review-grid">${content}</div>
+    </div>`
+  }
+
+  return `
+  <div class="card">
+    <div class="card-header">
+      <h2>Review &amp; Submit</h2>
+      <p>Check all values before final submission. Click any step in the progress bar to go back and edit.</p>
+    </div>
+
+    ${highLoadWarn ? `<div class="review-warn">
+      ⚠️ <strong>Warning:</strong> This asset has a high cognitive load rating and is tagged for
+      acute crisis or post-bad-news delivery. Please confirm this is intentional before submitting.
+    </div>` : ''}
+
+    ${section('Step 1 — Basics', [
+      row('Title', d.title),
+      row('Content type', d.content_type),
+      row('Module ID', d.module_id),
+      row('Lesson ID', d.lesson_id),
+      row('Author / source', d.author_source),
+      row('Version', d.version),
+      row('Clinically reviewed', d.clinical_reviewed ? 'Yes' : 'No'),
+      row('Plain language version', d.plain_language_version ? 'Yes' : 'No'),
+      row('Languages', d.language_versions),
+      row('File', d.original_filename),
+    ])}
+
+    ${section('Step 2 — Classification', [
+      row('Disease relevance', d.disease_relevance_tags),
+      row('Concept domain', d.concept_domain),
+      row('Primary concept', d.primary_concept),
+      row('Secondary concepts', d.secondary_concepts),
+      row('Explains symptom', d.explains_symptom),
+      row('Explains procedure', d.explains_procedure),
+    ])}
+
+    ${section('Step 3 — Learning Pathway', [
+      row('Explanation role', d.explanation_role),
+      row('Sequence position', d.sequence_position),
+      row('Learning objective', d.learning_objective),
+      row("Bloom's level", d.bloom_level),
+      row('Object granularity', d.object_granularity),
+      row('Can stand alone', d.can_stand_alone ? 'Yes' : 'No'),
+      row('Instructional strategy', d.instructional_strategy),
+    ])}
+
+    ${section('Step 4 — Audience & Literacy', [
+      row('Target audience', d.target_audience),
+      row('Health literacy level', d.health_literacy_level),
+      row('Medical terminology level', d.medical_terminology_level),
+      row('Reading level grade', d.reading_level_grade),
+      row('Modality type', d.modality_type),
+    ])}
+
+    ${section('Step 5 — Adaptive Delivery', [
+      row('Stress state compatibility', d.stress_state_compatibility),
+      row('Parent expertise stage', d.parent_expertise_stage),
+      row('Care journey stage', d.care_journey_stage),
+      row('Cognitive load rating', d.cognitive_load_rating),
+      row('Element interactivity', d.element_interactivity),
+      row('Appropriate after event', d.appropriate_after_event),
+      row('Contraindicated after event', d.contraindicated_after_event),
+      row('Just-in-time trigger', d.just_in_time_trigger),
+    ])}
+
+    ${section('Step 6 — Psychosocial', [
+      row('Emotional tone', d.emotional_tone),
+      row('Emotional sensitivity', d.emotional_sensitivity_level),
+      row('Includes reassurance', d.includes_reassurance ? 'Yes' : 'No'),
+      row('Addresses guilt/blame', d.addresses_guilt_or_blame ? 'Yes' : 'No'),
+      row('Decision support context', d.decision_support_context ? 'Yes' : 'No'),
+      row('Isolation acknowledgment', d.isolation_acknowledgment ? 'Yes' : 'No'),
+    ])}
+
+    ${section('Step 7 — NLP & Searchability', [
+      row('Parent question patterns', d.parent_question_patterns),
+      row('Query synonyms', d.query_synonyms),
+      row('Intent type', d.intent_type),
+      row('Response type', d.response_type),
+      row('Keyword triggers', d.keyword_triggers),
+    ])}
+
+    ${section('Step 8 — Accessibility', [
+      row('Closed captions', d.closed_captions != null ? (d.closed_captions ? 'Yes' : 'No') : ''),
+      row('Alt text', d.alt_text),
+      row('Audio narration', d.audio_narration ? 'Yes' : 'No'),
+      row('Screen reader compatible', d.screen_reader_compatible ? 'Yes' : 'No'),
+      row('Mobile optimized', d.mobile_optimized ? 'Yes' : 'No'),
+    ])}
+
+    <div class="nav">
+      <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
+      <button class="btn btn-success" onclick="submitAsset()">Submit Asset ✓</button>
+    </div>
+  </div>`
+}
+
+function renderSuccess(assetId) {
+  el('stepsContainer').innerHTML = `
+  <div class="card">
+    <div class="success-screen">
+      <div class="check">✅</div>
+      <h2>Asset uploaded successfully</h2>
+      <div class="asset-id-display">${assetId}</div>
+      <p>Your asset has been saved to MongoDB.<br>You can view it now in Compass.</p>
+      <br>
+      <button class="btn btn-primary" onclick="location.reload()">Upload another asset</button>
+    </div>
+  </div>`
+  el('progressWrap') && el('progressWrap').classList.add('hidden')
+}
+
+// ─── Progress bar ──────────────────────────────────────────────────────────────
+function updateProgress() {
+  const steps = el('progressSteps')
+  const fill  = el('progressFill')
+  steps.innerHTML = STEPS.map((s, i) => {
+    let cls = ''
+    if (i === state.currentStep) cls = 'active'
+    else if (i < state.currentStep) cls = 'done'
+    return `<div class="progress-step ${cls}" onclick="goToStep(${i})">${s.label}</div>`
+  }).join('')
+  fill.style.width = `${(state.currentStep / (STEPS.length - 1)) * 100}%`
+}
+
+function goToStep(idx) {
+  if (idx > state.currentStep) return // can't skip forward
+  saveInputs()
+  state.currentStep = idx
+  renderStep(idx)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ─── Navigation ───────────────────────────────────────────────────────────────
+function nextStep() {
+  saveInputs()
+  hideAlert()
+  if (!validateStep(state.currentStep)) return
+  state.currentStep++
+  renderStep(state.currentStep)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function prevStep() {
+  saveInputs()
+  state.currentStep--
+  renderStep(state.currentStep)
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+// ─── Validation ───────────────────────────────────────────────────────────────
+function validateStep(idx) {
+  const d = state.data
+  let ok = true
+
+  function require(condition, msg) {
+    if (!condition) { showAlert(msg); ok = false }
+  }
+
+  if (idx === 0) {
+    require(d.title?.trim(), 'Title is required.')
+    require(d.module_id, 'Module ID is required.')
+    require(d.lesson_id?.trim(), 'Lesson ID is required.')
+    require(d.content_type, 'Content type is required.')
+    require(d.author_source?.trim(), 'Author / source is required.')
+    require((d.language_versions || []).length > 0, 'At least one language version is required.')
+  }
+  if (idx === 1) {
+    require((d.disease_relevance_tags || []).length > 0, 'At least one disease relevance tag is required.')
+    require(d.concept_domain, 'Concept domain is required.')
+    require(d.primary_concept?.trim(), 'Primary concept is required.')
+    require((d.secondary_concepts || []).length > 0, 'At least one secondary concept is required.')
+  }
+  if (idx === 2) {
+    require(d.explanation_role, 'Explanation role is required.')
+    require(d.sequence_position, 'Sequence position is required.')
+    require(d.learning_objective?.trim(), 'Learning objective is required.')
+    require(d.bloom_level, "Bloom's level is required.")
+    require(d.object_granularity, 'Object granularity is required.')
+    if (d.can_stand_alone === false) {
+      require((d.prerequisite_concept_ids || []).length > 0,
+        'This asset cannot stand alone — please add at least one prerequisite asset.')
+    }
+    // Soft warning for learning objective verb
+    const obj = (d.learning_objective || '').trim()
+    const startsWithVerb = obj && obj[0] === obj[0].toUpperCase()
+    if (obj && !startsWithVerb) {
+      showAlert("⚠️ Learning objectives should start with an action verb (e.g. 'Explain', 'Identify'). You can still continue.")
+    }
+  }
+  if (idx === 3) {
+    require((d.target_audience || []).length > 0, 'At least one target audience is required.')
+    require(d.health_literacy_level, 'Health literacy level is required.')
+    require(d.medical_terminology_level, 'Medical terminology level is required.')
+    require(d.modality_type, 'Modality type is required.')
+  }
+  if (idx === 4) {
+    require((d.stress_state_compatibility || []).length > 0, 'At least one stress state is required.')
+    require((d.parent_expertise_stage || []).length > 0, 'At least one parent expertise stage is required.')
+    require((d.care_journey_stage || []).length > 0, 'At least one care journey stage is required.')
+    require(d.cognitive_load_rating, 'Cognitive load rating is required.')
+    require(d.element_interactivity, 'Element interactivity is required.')
+  }
+  if (idx === 5) {
+    require(d.emotional_tone, 'Emotional tone is required.')
+    require(d.emotional_sensitivity_level, 'Emotional sensitivity level is required.')
+  }
+  if (idx === 6) {
+    require((d.parent_question_patterns || []).length >= 2, 'Please add at least 2 parent question patterns.')
+    require(d.intent_type, 'Intent type is required.')
+    require(d.response_type, 'Response type is required.')
+    require((d.keyword_triggers || []).length >= 3, 'Please add at least 3 keyword triggers.')
+  }
+  if (idx === 7) {
+    const ct = d.content_type || ''
+    if (['video_segment','animation','procedural_demo'].includes(ct)) {
+      require(d.closed_captions != null, 'Closed captions field is required for this content type.')
+    }
+    if (['diagram','animation'].includes(ct)) {
+      require(d.alt_text?.trim(), 'Alt text is required for this content type.')
+    }
+  }
+
+  return ok
+}
+
+// ─── File handling ────────────────────────────────────────────────────────────
+function handleFileSelect(input) {
+  const file = input.files[0]
+  if (!file) return
+  state.selectedFile = file
+  state.data.original_filename = file.name
+  const chosen = el('fileChosen')
+  chosen.textContent = '✓ ' + file.name
+  chosen.classList.remove('hidden')
+}
+
+function handleTranscriptSelect(input) {
+  const file = input.files[0]
+  if (!file) return
+  state.transcriptFile = file
+  const chosen = el('transcriptChosen')
+  chosen.textContent = '✓ ' + file.name
+  chosen.classList.remove('hidden')
+}
+
+// ─── Submit ───────────────────────────────────────────────────────────────────
+async function submitAsset() {
+  saveInputs()
+  hideAlert()
+
+  const d = state.data
+  const load   = d.cognitive_load_rating
+  const stress = d.stress_state_compatibility || []
+  if (load === 'high' && stress.some(s => ['acute_crisis','post_bad_news'].includes(s))) {
+    if (!confirm('⚠️ High cognitive load content is not recommended for acute crisis delivery. Submit anyway?')) return
+  }
+
+  const formData = new FormData()
+  if (state.selectedFile)   formData.append('file', state.selectedFile)
+  if (state.transcriptFile) formData.append('transcript', state.transcriptFile)
+
+  // Append all state fields
+  Object.entries(d).forEach(([key, val]) => {
+    if (val == null) return
+    if (Array.isArray(val)) {
+      val.forEach(v => formData.append(key + '[]', v))
+    } else {
+      formData.append(key, val)
+    }
+  })
+
+  try {
+    const res  = await fetch('/upload', { method: 'POST', body: formData })
+    const json = await res.json()
+    if (json.success) {
+      renderSuccess(json.asset_id)
+    } else {
+      showAlert('Submission error: ' + json.error)
+    }
+  } catch (err) {
+    showAlert('Network error: ' + err.message)
+  }
+}
+
+// ─── Load existing assets for typeahead ──────────────────────────────────────
+async function loadAssets() {
+  try {
+    const res  = await fetch('/assets')
+    state.allAssets = await res.json()
+  } catch(e) { console.warn('Could not load assets for typeahead', e) }
+}
+
+// ─── Init ─────────────────────────────────────────────────────────────────────
+// Set defaults
+state.data.version              = 'v1.0'
+state.data.language_versions    = ['en']
+state.data.screen_reader_compatible = true
+state.data.mobile_optimized     = true
+state.data.can_stand_alone      = true
+state.data.clinical_reviewed    = false
+state.data.plain_language_version = false
+state.data.includes_reassurance   = false
+state.data.addresses_guilt_or_blame = false
+state.data.decision_support_context = false
+state.data.isolation_acknowledgment = false
+state.data.audio_narration      = false
+state.data.closed_captions      = false
+
+// ─── Load existing assets for typeahead ──────────────────────
+async function loadAssets() {
+  try {
+    const res  = await fetch('/assets')
+    state.allAssets = await res.json()
+  } catch(e) { console.warn('Could not load assets for typeahead', e) }
+}
+
+// ─── Edit mode: load existing asset into state ────────────────
+async function loadEditAsset(id) {
+  try {
+    const res   = await fetch(`/assets/${id}`)
+    const asset = await res.json()
+
+    // Scalar fields
+    const scalars = [
+      'title','content_type','module_id','lesson_id','author_source','version',
+      'concept_domain','primary_concept','explanation_role','sequence_position',
+      'learning_objective','bloom_level','object_granularity','just_in_time_trigger',
+      'health_literacy_level','medical_terminology_level','reading_level_grade',
+      'modality_type','cognitive_load_rating','element_interactivity',
+      'emotional_tone','emotional_sensitivity_level','intent_type','response_type',
+      'alt_text','asset_id','original_filename'
+    ]
+    scalars.forEach(f => {
+      if (asset[f] !== undefined && asset[f] !== null) state.data[f] = asset[f]
+    })
+
+    // Boolean fields
+    const bools = [
+      'clinical_reviewed','plain_language_version','can_stand_alone',
+      'includes_reassurance','addresses_guilt_or_blame','decision_support_context',
+      'isolation_acknowledgment','audio_narration','screen_reader_compatible',
+      'mobile_optimized','closed_captions'
+    ]
+    bools.forEach(f => {
+      if (asset[f] !== undefined && asset[f] !== null) state.data[f] = asset[f]
+    })
+
+    // Array fields
+    const arrays = [
+      'language_versions','disease_relevance_tags','secondary_concepts',
+      'explains_symptom','explains_procedure','instructional_strategy',
+      'target_audience','stress_state_compatibility','parent_expertise_stage',
+      'care_journey_stage','appropriate_after_event','contraindicated_after_event',
+      'parent_question_patterns','query_synonyms','keyword_triggers',
+      'prerequisite_concept_ids','next_concept_ids'
+    ]
+    arrays.forEach(f => {
+      if (Array.isArray(asset[f])) state.data[f] = asset[f]
+    })
+
+    state.editId = id
+    return true
+  } catch(e) {
+    console.error('Failed to load asset for editing', e)
+    return false
+  }
+}
+
+// ─── Override submitAsset to handle edit mode ─────────────────
+const _originalSubmit = submitAsset
+async function submitAsset() {
+  if (!state.editId) { await _originalSubmit(); return }
+
+  saveInputs()
+  hideAlert()
+
+  const d = state.data
+  const load   = d.cognitive_load_rating
+  const stress = d.stress_state_compatibility || []
+  if (load === 'high' && stress.some(s => ['acute_crisis','post_bad_news'].includes(s))) {
+    if (!confirm('⚠️ High cognitive load content is not recommended for acute crisis delivery. Submit anyway?')) return
+  }
+
+  const formData = new FormData()
+  if (state.selectedFile)   formData.append('file', state.selectedFile)
+  if (state.transcriptFile) formData.append('transcript', state.transcriptFile)
+
+  Object.entries(d).forEach(([key, val]) => {
+    if (val == null) return
+    if (Array.isArray(val)) {
+      val.forEach(v => formData.append(key + '[]', v))
+    } else {
+      formData.append(key, val)
+    }
+  })
+
+  try {
+    const res  = await fetch(`/assets/${state.editId}`, { method: 'PATCH', body: formData })
+    const json = await res.json()
+    if (json.success) {
+      el('stepsContainer').innerHTML = `
+        <div class="card">
+          <div class="success-screen">
+            <div class="check">✅</div>
+            <h2>Asset updated successfully</h2>
+            <div class="asset-id-display">${json.asset.asset_id}</div>
+            <p>Your changes have been saved to MongoDB.</p>
+            <br>
+            <div style="display:flex;gap:12px;justify-content:center">
+              <button class="btn btn-primary" onclick="location.href='/browse.html'">Back to browser</button>
+              <button class="btn btn-secondary" onclick="location.reload()">Edit again</button>
+            </div>
+          </div>
+        </div>`
+    } else {
+      showAlert('Update error: ' + json.error)
+    }
+  } catch(err) {
+    showAlert('Network error: ' + err.message)
+  }
+}
+
+// ─── Init ─────────────────────────────────────────────────────
+// Set defaults for NEW assets only
+const urlParams = new URLSearchParams(window.location.search)
+const editId    = urlParams.get('edit')
+
+if (editId) {
+  // Edit mode — load asset first, then render
+  state.editId = editId
+  loadAssets().then(() => loadEditAsset(editId)).then(() => {
+    renderStep(0)
+    // Show edit mode banner
+    document.querySelector('.app').insertAdjacentHTML('afterbegin', `
+      <div style="background:#fffbeb;border:1px solid #f59e0b;border-radius:8px;
+        padding:12px 16px;margin-bottom:20px;font-size:14px;color:#92400e;
+        display:flex;justify-content:space-between;align-items:center">
+        <span>✏️ <strong>Edit mode</strong> — you are editing an existing asset. All fields are pre-filled.</span>
+        <a href="/browse.html" style="color:#92400e;font-size:13px">Cancel → back to browser</a>
+      </div>`)
+  })
+} else {
+  // New asset mode — set defaults
+  state.data.version                  = 'v1.0'
+  state.data.language_versions        = ['en']
+  state.data.screen_reader_compatible = true
+  state.data.mobile_optimized         = true
+  state.data.can_stand_alone          = true
+  state.data.clinical_reviewed        = false
+  state.data.plain_language_version   = false
+  state.data.includes_reassurance     = false
+  state.data.addresses_guilt_or_blame = false
+  state.data.decision_support_context = false
+  state.data.isolation_acknowledgment = false
+  state.data.audio_narration          = false
+  state.data.closed_captions          = false
+  loadAssets()
+  renderStep(0)
+}
+</script>
+</body>
+</html>
