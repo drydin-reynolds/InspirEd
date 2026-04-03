@@ -44,3 +44,4 @@ app-example
 
 # vs
 .vs/
+/asset-admin/.env
