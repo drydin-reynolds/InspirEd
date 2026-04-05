@@ -43,7 +43,7 @@ async function extractTextFromPDF(pdfPath) {
   const pdfData = fs.readFileSync(pdfPath);
   const base64PDF = pdfData.toString('base64');
   
-  const response = await callGeminiAPI('models/gemini-2.0-flash:generateContent', {
+  const response = await callGeminiAPI('models/gemini-2.5-flash:generateContent', {
     contents: [{
       parts: [
         {
@@ -87,14 +87,21 @@ function chunkText(text, source) {
 }
 
 async function generateEmbedding(text) {
-  const response = await callGeminiAPI('models/text-embedding-004:embedContent', {
-    model: 'models/text-embedding-004',
+  const response = await callGeminiAPI('models/gemini-embedding-001:embedContent', {
+    model: 'models/gemini-embedding-001',
     content: {
       parts: [{ text: text.slice(0, 8000) }], // Limit text length
     },
+    outputDimensionality: 768,
+    taskType: 'RETRIEVAL_DOCUMENT',
   });
-  
-  return response.embedding?.values || [];
+
+  return (
+    response.embedding?.values ||
+    response.embedding?.value ||
+    (Array.isArray(response.embeddings) && response.embeddings[0]?.values) ||
+    []
+  );
 }
 
 async function processAllPDFs() {
