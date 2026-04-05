@@ -158,6 +158,8 @@ To update the knowledge base:
 node scripts/process-pdfs.js
 ```
 
+**Optional — MongoDB + asset-admin:** Chunks can be synced to Atlas and retrieved via `POST /api/rag/search` on the `asset-admin` server. Set **`EXPO_PUBLIC_RAG_API_URL`** (e.g. `http://YOUR_LAN_IP:3000`) so the app uses that API for retrieval instead of only the bundled JSON. Full steps: **[docs/rag-mongodb-setup.md](docs/rag-mongodb-setup.md)**.
+
 ---
 
 ## License
