@@ -1,12 +1,16 @@
 require('dotenv').config()
 const express  = require('express')
+const cors     = require('cors')
 const mongoose = require('mongoose')
 const multer   = require('multer')
 const path     = require('path')
 const Asset    = require('./models/Asset')
+const RagChunk = require('./models/RagChunk')
+const { searchRagChunks } = require('./lib/ragSearch')
 
 const app = express()
 app.use(express.json())
+app.use(cors({ origin: true }))
 app.use(express.static('public'))
 app.use('/uploads', express.static('uploads'))
 
@@ -347,6 +351,35 @@ app.get('/test-save', async (req, res) => {
 
 
 
+
+// ── RAG: vector search over RagChunk (sync from medical-knowledge.json) ──
+app.post('/api/rag/search', async (req, res) => {
+  try {
+    const { query, topK = 3, minSimilarity = 0.3 } = req.body || {}
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ error: 'Body must include { query: string }' })
+    }
+    const results = await searchRagChunks({
+      query,
+      RagChunk,
+      topK: Number(topK) || 3,
+      minSimilarity: Number(minSimilarity) || 0.3,
+    })
+    res.json({ results })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/rag/stats', async (req, res) => {
+  try {
+    const totalChunks = await RagChunk.countDocuments()
+    const sources = await RagChunk.distinct('source')
+    res.json({ totalChunks, sources })
+  } catch (err) {
+    res.status(500).json({ error: err.message })
+  }
+})
 
 // ── Connect to MongoDB then start server ──────────────────────
 mongoose.connect(process.env.MONGO_URI)
