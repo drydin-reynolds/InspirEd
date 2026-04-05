@@ -44,6 +44,21 @@ export interface RAGContextWithCitations {
 let knowledgeBase: KnowledgeBase | null = null;
 let ai: GoogleGenAI | null = null;
 
+function getRagApiBaseUrl(): string {
+  const raw =
+    process.env.EXPO_PUBLIC_RAG_API_URL ||
+    Constants.expoConfig?.extra?.RAG_API_URL ||
+    (Constants.manifest2?.extra?.expoClient?.extra as { RAG_API_URL?: string } | undefined)
+      ?.RAG_API_URL ||
+    "";
+  return String(raw || "").replace(/\/$/, "");
+}
+
+/** When set, retrieval uses asset-admin POST /api/rag/search (Mongo RagChunk) first. */
+export function usesRemoteRag(): boolean {
+  return getRagApiBaseUrl().length > 0;
+}
+
 const getApiKey = (): string => {
   const apiKey = 
     process.env.GEMINI_API_KEY || 
@@ -68,14 +83,19 @@ const getAI = (): GoogleGenAI => {
  */
 export async function loadKnowledgeBase(): Promise<boolean> {
   if (knowledgeBase) return true;
-  
+
   try {
-    // Dynamic import for the bundled knowledge base
-    const data = require('@/assets/medical-knowledge.json');
-    knowledgeBase = data as KnowledgeBase;
-    console.log(`[RAG] Loaded ${knowledgeBase.totalChunks} chunks from ${knowledgeBase.sources.length} sources`);
+    const data = require('@/assets/medical-knowledge.json') as KnowledgeBase;
+    knowledgeBase = data;
+    console.log(
+      `[RAG] Loaded ${knowledgeBase.totalChunks} chunks locally from medical-knowledge.json`
+    );
     return true;
   } catch (error) {
+    if (usesRemoteRag()) {
+      console.log("[RAG] No local JSON; retrieval will use RAG_API_URL (Mongo) when configured");
+      return true;
+    }
     console.warn('[RAG] Knowledge base not available:', error);
     return false;
   }
@@ -107,15 +127,17 @@ function cosineSimilarity(a: number[], b: number[]): number {
 async function generateQueryEmbedding(query: string): Promise<number[]> {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${getApiKey()}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${getApiKey()}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/gemini-embedding-001',
           content: {
             parts: [{ text: query }],
           },
+          outputDimensionality: 768,
+          taskType: 'RETRIEVAL_QUERY',
         }),
       }
     );
@@ -125,10 +147,57 @@ async function generateQueryEmbedding(query: string): Promise<number[]> {
     }
     
     const data = await response.json();
-    return data.embedding?.values || [];
+    return (
+      data.embedding?.values ||
+      data.embedding?.value ||
+      (Array.isArray(data.embeddings) && data.embeddings[0]?.values) ||
+      []
+    );
   } catch (error) {
     console.error('[RAG] Error generating query embedding:', error);
     return [];
+  }
+}
+
+type ApiChunkHit = {
+  chunk: { id: string; text: string; source: string; chunkIndex: number };
+  similarity: number;
+};
+
+/** Mongo-backed search via asset-admin. Undefined = error (fall back to local JSON). */
+async function retrieveFromMongoApi(
+  query: string,
+  topK: number,
+  minSimilarity: number
+): Promise<RetrievalResult[] | undefined> {
+  const base = getRagApiBaseUrl();
+  if (!base) return undefined;
+
+  try {
+    const res = await fetch(`${base}/api/rag/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, topK, minSimilarity }),
+    });
+    if (!res.ok) {
+      console.warn(`[RAG] API /api/rag/search failed: ${res.status}`);
+      return undefined;
+    }
+    const data = (await res.json()) as { results?: ApiChunkHit[] };
+    const hits = data.results ?? [];
+    return hits.map((h) => ({
+      chunk: {
+        id: h.chunk.id,
+        text: h.chunk.text,
+        source: h.chunk.source,
+        chunkIndex: h.chunk.chunkIndex,
+        embedding: [],
+      },
+      similarity: h.similarity,
+    }));
+  } catch (e) {
+    console.warn("[RAG] Mongo API unreachable, falling back to local JSON if present:", e);
+    return undefined;
   }
 }
 
@@ -140,7 +209,12 @@ export async function retrieveRelevantContext(
   topK: number = 3,
   minSimilarity: number = 0.3
 ): Promise<RetrievalResult[]> {
-  // Ensure knowledge base is loaded
+  const fromApi = await retrieveFromMongoApi(query, topK, minSimilarity);
+  if (fromApi !== undefined) {
+    console.log(`[RAG] ${fromApi.length} chunk(s) from Mongo API`);
+    return fromApi;
+  }
+
   const loaded = await loadKnowledgeBase();
   if (!loaded || !knowledgeBase) {
     console.warn('[RAG] Knowledge base not available');
@@ -265,6 +339,7 @@ export async function getRAGContextWithCitations(
  * Check if the knowledge base is available
  */
 export function isKnowledgeBaseAvailable(): boolean {
+  if (usesRemoteRag()) return true;
   return knowledgeBase !== null && knowledgeBase.totalChunks > 0;
 }
 
