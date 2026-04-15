@@ -12,6 +12,7 @@ import { useAppContext, LearningModule, Message, Citation } from "@/context/AppC
 import { useNavigation } from "@react-navigation/native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { askEducationalQuestion } from "@/utils/gemini";
+import { SearchBar } from "@/components/SearchBar";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -24,6 +25,7 @@ export default function EducationScreen() {
   const [showChat, setShowChat] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
 
   const completedCount = learningModules.filter((m) => m.completed).length;
   const totalCount = learningModules.length;
@@ -151,32 +153,13 @@ export default function EducationScreen() {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <ThemedView
-          style={[
-            styles.progressCard,
-            {
-              backgroundColor: theme.primary,
-            },
-          ]}
-        >
-          <ThemedText style={styles.progressTitle}>Your Learning Progress</ThemedText>
-          <View style={styles.progressStats}>
-            <ThemedText style={styles.progressNumber}>{completedCount}</ThemedText>
-            <ThemedText style={styles.progressLabel}>/ {totalCount} modules completed</ThemedText>
-          </View>
-          <View style={[styles.progressBar, { backgroundColor: "rgba(255,255,255,0.3)" }]}>
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  backgroundColor: theme.accent,
-                  width: `${overallProgress}%`,
-                },
-              ]}
-            />
-          </View>
-        </ThemedView>
-
+        <SearchBar
+            value={searchText}
+            onChangeText={setSearchText}
+            placeholder="Search modules..."
+            onClear={() => setSearchText("")}
+        />
+        
         <View style={styles.actionButtons}>
           <Button
             onPress={() => setShowChat(true)}
@@ -197,21 +180,7 @@ export default function EducationScreen() {
           </Pressable>
         </View>
 
-        {categories.map((category) => {
-          const categoryModules = learningModules.filter((m) => m.category === category);
-          return (
-            <View key={category} style={styles.categorySection}>
-              <ThemedText style={styles.categoryTitle}>{category}</ThemedText>
-              {categoryModules.map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  onPress={() => navigation.navigate("ModuleDetail", { moduleId: module.id })}
-                />
-              ))}
-            </View>
-          );
-        })}
+        
       </View>
     </ScreenScrollView>
   );

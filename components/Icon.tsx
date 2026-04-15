@@ -43,7 +43,8 @@ type IconName =
   | "videocam-off"
   | "play-circle"
   | "expand"
-  | "contract";
+  | "contract"
+  | "search";
 
 type IconProps = {
   name: IconName;
@@ -352,7 +353,15 @@ export function Icon({ name, size = 24, color = "#000", style }: IconProps) {
             <Line x1="14" y1="10" x2="21" y2="3" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
             <Line x1="3" y1="21" x2="10" y2="14" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
           </>
-        );
+            );
+        case "search":
+            return (
+                <>
+                    <Circle cx="11" cy="11" r="6" stroke={color} strokeWidth={strokeWidth} fill="none" />
+
+                    <Line x1="16" y1="16" x2="21" y2="21" stroke={color} strokeWidth={strokeWidth} strokeLinecap="round" />
+                </>
+            );
       default:
         return (
           <Circle cx="12" cy="12" r="8" stroke={color} strokeWidth={strokeWidth} fill="none" />
