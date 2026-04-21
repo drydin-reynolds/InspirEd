@@ -22,16 +22,15 @@ const assetSchema = new mongoose.Schema({
   },
   module_id:            { type: Number, required: true, min: 1, max: 99 },
   lesson_id:            { type: String, required: true },
-  author_source:        { type: String, required: true },
-  clinical_reviewed:    { type: Boolean, required: true },
-  version:              { type: String, required: true, default: 'v1.0' },
+  author_source:        { type: String, default: '' },
+  clinical_reviewed:    { type: Boolean, default: false },
+  version:              { type: String, default: 'v1.0' },
   language_versions: {
     type: [String],
-    required: true,
     enum: ['en','es','fr','pt','zh','other'],
     default: ['en']
   },
-  plain_language_version: { type: Boolean, required: true },
+  plain_language_version: { type: Boolean, default: false },
 
   // ── Step 2: Content Classification ──────────────────────────
   disease_relevance_tags: {
@@ -52,20 +51,20 @@ const assetSchema = new mongoose.Schema({
   // ── Step 3: Learning Pathway ─────────────────────────────────
   explanation_role: {
     type: String,
-    required: true,
-    enum: ['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up']
+    enum: ['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up'],
+    default: 'definition'
   },
-  sequence_position:  { type: Number, required: true, min: 1 },
-  learning_objective: { type: String, required: true },
+  sequence_position:  { type: Number, min: 1, default: 1 },
+  learning_objective: { type: String, default: '' },
   bloom_level: {
     type: String,
-    required: true,
-    enum: ['remember','understand','apply','analyze','evaluate','create']
+    enum: ['remember','understand','apply','analyze','evaluate','create'],
+    default: 'understand'
   },
   object_granularity: {
     type: String,
-    required: true,
-    enum: ['micro','meso','macro']
+    enum: ['micro','meso','macro'],
+    default: 'meso'
   },
   can_stand_alone:          { type: Boolean, required: true },
   prerequisite_concept_ids: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Asset' }],
@@ -95,8 +94,8 @@ const assetSchema = new mongoose.Schema({
   reading_level_grade: { type: Number, min: 1, max: 16 },
   modality_type: {
     type: String,
-    required: true,
-    enum: ['visual_only','audio_only','audio_visual','text_only','interactive']
+    enum: ['visual_only','audio_only','audio_visual','text_only','interactive'],
+    default: 'audio_visual'
   },
 
   // ── Step 5: Adaptive Delivery ────────────────────────────────
@@ -117,13 +116,13 @@ const assetSchema = new mongoose.Schema({
   },
   cognitive_load_rating: {
     type: String,
-    required: true,
-    enum: ['low','medium','high']
+    enum: ['low','medium','high'],
+    default: 'medium'
   },
   element_interactivity: {
     type: String,
-    required: true,
-    enum: ['low','medium','high']
+    enum: ['low','medium','high'],
+    default: 'medium'
   },
   appropriate_after_event:     { type: [String], default: [] },
   contraindicated_after_event: { type: [String], default: [] },
@@ -132,40 +131,40 @@ const assetSchema = new mongoose.Schema({
   // ── Step 6: Psychosocial ─────────────────────────────────────
   emotional_tone: {
     type: String,
-    required: true,
-    enum: ['reassuring','matter_of_fact','empowering','cautionary','validating']
+    enum: ['reassuring','matter_of_fact','empowering','cautionary','validating'],
+    default: 'reassuring'
   },
   emotional_sensitivity_level: {
     type: String,
-    required: true,
-    enum: ['low','medium','high','critical']
+    enum: ['low','medium','high','critical'],
+    default: 'medium'
   },
-  includes_reassurance:     { type: Boolean, required: true },
-  addresses_guilt_or_blame: { type: Boolean, required: true },
-  decision_support_context: { type: Boolean, required: true },
-  isolation_acknowledgment: { type: Boolean, required: true },
+  includes_reassurance:     { type: Boolean, default: false },
+  addresses_guilt_or_blame: { type: Boolean, default: false },
+  decision_support_context: { type: Boolean, default: false },
+  isolation_acknowledgment: { type: Boolean, default: false },
 
   // ── Step 7: NLP & Searchability ──────────────────────────────
   parent_question_patterns: { type: [String], required: true },
   query_synonyms:           { type: [String], default: [] },
   intent_type: {
     type: String,
-    required: true,
-    enum: ['explain','reassure','define','compare','decide','procedure_how_to','prognosis']
+    enum: ['explain','reassure','define','compare','decide','procedure_how_to','prognosis'],
+    default: 'explain'
   },
   response_type: {
     type: String,
-    required: true,
-    enum: ['explanation','definition','analogy','reassurance','decision_support','step_by_step']
+    enum: ['explanation','definition','analogy','reassurance','decision_support','step_by_step'],
+    default: 'explanation'
   },
   keyword_triggers: { type: [String], required: true },
 
   // ── Step 8: Accessibility ────────────────────────────────────
   closed_captions:          { type: Boolean },
   alt_text:                 { type: String, maxlength: 500 },
-  audio_narration:          { type: Boolean, required: true },
-  screen_reader_compatible: { type: Boolean, required: true, default: true },
-  mobile_optimized:         { type: Boolean, required: true, default: true },
+  audio_narration:          { type: Boolean, default: false },
+  screen_reader_compatible: { type: Boolean, default: true },
+  mobile_optimized:         { type: Boolean, default: true },
   transcript_file_path:     { type: String },
 
   // ── RAG / embedding lifecycle (prototype) ───────────────────
@@ -213,18 +212,6 @@ assetSchema.pre('save', async function () {
     throw new Error('You indicated this cannot stand alone. Please add at least one prerequisite asset.')
   }
 
-  // Block: closed captions missing for video/audio types
-  const needsCaptions = ['video_segment','animation','procedural_demo']
-  if (needsCaptions.includes(this.content_type) && this.closed_captions == null) {
-    throw new Error('Closed captions is required for video, animation, and procedural demo content.')
-  }
-
-  // Block: alt text missing for visual types
-  const needsAlt = ['diagram','animation']
-  if (needsAlt.includes(this.content_type) && !this.alt_text) {
-    throw new Error('Alt text is required for diagram and animation content types.')
-  }
-
   // Block: NLP minimums
   if (!this.parent_question_patterns || this.parent_question_patterns.length < 2) {
     throw new Error('Please add at least 2 parent question patterns.')
@@ -236,6 +223,11 @@ assetSchema.pre('save', async function () {
   // Block: disease relevance tags empty
   if (!this.disease_relevance_tags || this.disease_relevance_tags.length === 0) {
     throw new Error('At least one diagnosis tag is required.')
+  }
+
+  // Block: at least one target audience (Minimum Tags.md)
+  if (!this.target_audience || this.target_audience.length === 0) {
+    throw new Error('At least one target audience is required.')
   }
 })
 
