@@ -4,7 +4,11 @@ const cors     = require('cors')
 const mongoose = require('mongoose')
 const multer   = require('multer')
 const path     = require('path')
+const fs       = require('fs')
 const Asset    = require('./models/Asset')
+
+const UPLOAD_DIR = path.join(__dirname, 'uploads')
+fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 const Chunk    = require('./models/Chunk')
 const { queueIngest } = require('./lib/ragIngest')
 const rateLimit = require('express-rate-limit')
@@ -33,12 +37,12 @@ app.use('/api', (req, res, next) => {
   next()
 })
 app.use(cors({ origin: true }))
-app.use(express.static('public'))
-app.use('/uploads', express.static('uploads'))
+app.use(express.static(path.join(__dirname, 'public')))
+app.use('/uploads', express.static(UPLOAD_DIR))
 
 // ── File upload config ────────────────────────────────────────
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => cb(null, 'uploads/'),
+  destination: (req, file, cb) => cb(null, UPLOAD_DIR),
   filename:    (req, file, cb) => {
     const unique = Date.now() + '-' + Math.round(Math.random() * 1e9)
     cb(null, unique + path.extname(file.originalname))
@@ -462,6 +466,14 @@ app.get('/test-save', async (req, res) => {
 
 
 
+
+// ── JSON error responses (multer / parse failures return HTML by default) ───
+app.use((err, req, res, next) => {
+  if (res.headersSent) return next(err)
+  console.error(err)
+  const status = err.status || err.statusCode || 500
+  res.status(status).json({ success: false, error: err.message || String(err) })
+})
 
 // ── RAG: vector search over RagChunk (sync from medical-knowledge.json) ──
 app.post('/api/rag/search', async (req, res) => {
