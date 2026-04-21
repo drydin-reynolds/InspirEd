@@ -629,27 +629,27 @@ function renderStep1() {
     ${field('author_source', 'Author / Source',
       `<input type="text" name="author_source" value="${state.data.author_source||''}"
         oninput="saveInputs()">`,
-      'Who created or clinically reviewed this content?', true)}
+      'Who created or clinically reviewed this content?')}
 
     ${field('version', 'Version',
       `<input type="text" name="version" value="${state.data.version||'v1.0'}"
         oninput="saveInputs()">`,
-      'Leave as v1.0 for new content.', true)}
+      'Leave as v1.0 for new content.')}
 
     ${field('clinical_reviewed', 'Clinically Reviewed',
       makeToggle('clinical_reviewed'),
-      'Has a chILD physician reviewed this content for accuracy?', true)}
+      'Has a chILD physician reviewed this content for accuracy?')}
 
     ${field('plain_language_version', 'Plain Language Version',
       makeToggle('plain_language_version'),
-      'Has a simplified-language version been created?', true)}
+      'Has a simplified-language version been created?')}
 
     ${field('language_versions', 'Language Versions',
       makeChips('language_versions', [
         {value:'en',label:'English'},{value:'es',label:'Spanish'},
         {value:'fr',label:'French'},{value:'pt',label:'Portuguese'},
         {value:'zh',label:'Chinese'},{value:'other',label:'Other'}
-      ]), 'Default: English. Select all that apply.', true)}
+      ]), 'Default: English. Select all that apply.')}
 
     <div class="nav">
       <div></div>
@@ -690,7 +690,7 @@ function renderStep2() {
 
     ${field('secondary_concepts', 'Secondary Concepts',
       makeTagInput('secondary_concepts', 'Type and press Enter…'),
-      'Supporting concepts explained in this object.', true)}
+      'Supporting concepts explained in this object.')}
 
     ${field('explains_symptom', 'Explains Symptom',
       makeTagInput('explains_symptom', 'e.g. rapid breathing — press Enter…'),
@@ -721,18 +721,18 @@ function renderStep3() {
         ${['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up'].map(v =>
           `<option value="${v}" ${state.data.explanation_role===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, 'Where does this object fit in a teaching sequence?', true)}
+      </select>`, 'Where does this object fit in a teaching sequence?')}
 
     ${field('sequence_position', 'Sequence Position',
       `<input type="number" name="sequence_position" min="1" value="${state.data.sequence_position||''}"
         oninput="saveInputs()">`,
-      'Position in the concept sequence. 1 = first.', true)}
+      'Position in the concept sequence. 1 = first.')}
 
     ${field('learning_objective', 'Learning Objective',
       `<input type="text" name="learning_objective" value="${state.data.learning_objective||''}"
         placeholder="e.g. Explain how surfactant reduces surface tension…" oninput="saveInputs()">`,
-      "Single sentence starting with a Bloom's verb.", true,
-      '', '', "Learning objectives should start with an action verb (e.g. 'Explain', 'Identify', 'Describe').")}
+      "Single sentence starting with a Bloom's verb.",
+      false, '', '', "Learning objectives should start with an action verb (e.g. 'Explain', 'Identify', 'Describe').")}
 
     ${field('bloom_level', 'Bloom\'s Level', `
       <select name="bloom_level" onchange="saveInputs()">
@@ -745,7 +745,7 @@ function renderStep3() {
           {v:'evaluate',d:'Make judgements'},
           {v:'create',d:'Produce something new'}
         ].map(o => `<option value="${o.v}" ${state.data.bloom_level===o.v?'selected':''}>${o.v} — ${o.d}</option>`).join('')}
-      </select>`, "Select the cognitive level this content targets.", true)}
+      </select>`, "Select the cognitive level this content targets.")}
 
     ${field('object_granularity', 'Object Granularity', `
       <select name="object_granularity" onchange="saveInputs()">
@@ -753,7 +753,7 @@ function renderStep3() {
         <option value="micro"  ${state.data.object_granularity==='micro' ?'selected':''}>Micro — single fact</option>
         <option value="meso"   ${state.data.object_granularity==='meso'  ?'selected':''}>Meso — single concept</option>
         <option value="macro"  ${state.data.object_granularity==='macro' ?'selected':''}>Macro — concept cluster</option>
-      </select>`, 'How much does this object cover?', true)}
+      </select>`, 'How much does this object cover?')}
 
     ${field('can_stand_alone', 'Can Stand Alone',
       makeToggle('can_stand_alone'),
@@ -838,7 +838,7 @@ function renderStep4() {
         ${['visual_only','audio_only','audio_visual','text_only','interactive'].map(v =>
           `<option value="${v}" ${state.data.modality_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, 'What sensory channels does this content use?', true)}
+      </select>`, 'What sensory channels does this content use?')}
 
     <div class="nav">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
@@ -905,7 +905,7 @@ function renderStep5() {
         <option value="low"    ${state.data.cognitive_load_rating==='low'   ?'selected':''}>Low — 1 concept</option>
         <option value="medium" ${state.data.cognitive_load_rating==='medium'?'selected':''}>Medium — 2–3 concepts</option>
         <option value="high"   ${state.data.cognitive_load_rating==='high'  ?'selected':''}>High — 4+ interacting concepts</option>
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('element_interactivity', 'Element Interactivity', `
       <select name="element_interactivity" onchange="saveInputs()">
@@ -913,7 +913,7 @@ function renderStep5() {
         <option value="low"    ${state.data.element_interactivity==='low'   ?'selected':''}>Low — 1–2 elements</option>
         <option value="medium" ${state.data.element_interactivity==='medium'?'selected':''}>Medium — 3–4 elements</option>
         <option value="high"   ${state.data.element_interactivity==='high'  ?'selected':''}>High — 5+ elements</option>
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('appropriate_after_event', 'Appropriate After Event',
       makeTagInput('appropriate_after_event', 'e.g. initial_diagnosis_appointment — press Enter…'),
@@ -948,7 +948,7 @@ function renderStep6() {
         ${['reassuring','matter_of_fact','empowering','cautionary','validating'].map(v =>
           `<option value="${v}" ${state.data.emotional_tone===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('emotional_sensitivity_level', 'Emotional Sensitivity Level', `
       <select name="emotional_sensitivity_level" onchange="saveInputs()">
@@ -956,19 +956,19 @@ function renderStep6() {
         ${['low','medium','high','critical'].map(v =>
           `<option value="${v}" ${state.data.emotional_sensitivity_level===v?'selected':''}>${v}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('includes_reassurance', 'Includes Reassurance',
-      makeToggle('includes_reassurance'), '', true)}
+      makeToggle('includes_reassurance'), '')}
 
     ${field('addresses_guilt_or_blame', 'Addresses Guilt or Blame',
-      makeToggle('addresses_guilt_or_blame'), '', true)}
+      makeToggle('addresses_guilt_or_blame'), '')}
 
     ${field('decision_support_context', 'Decision Support Context',
-      makeToggle('decision_support_context'), '', true)}
+      makeToggle('decision_support_context'), '')}
 
     ${field('isolation_acknowledgment', 'Isolation Acknowledgment',
-      makeToggle('isolation_acknowledgment'), '', true)}
+      makeToggle('isolation_acknowledgment'), '')}
 
     <div class="nav">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
@@ -1000,7 +1000,7 @@ function renderStep7() {
         ${['explain','reassure','define','compare','decide','procedure_how_to','prognosis'].map(v =>
           `<option value="${v}" ${state.data.intent_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('response_type', 'Response Type', `
       <select name="response_type" onchange="saveInputs()">
@@ -1008,7 +1008,7 @@ function renderStep7() {
         ${['explanation','definition','analogy','reassurance','decision_support','step_by_step'].map(v =>
           `<option value="${v}" ${state.data.response_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('keyword_triggers', 'Keyword Triggers',
       makeTagInput('keyword_triggers', 'Single word or short phrase — press Enter…'),
@@ -1035,28 +1035,27 @@ function renderStep8() {
     </div>
 
     <div class="field ${needsCaptions ? '' : 'hidden'}" id="row_closed_captions">
-      <label>Closed Captions <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      <label>Closed Captions <span class="badge badge-cond">conditional</span></label>
       ${makeToggle('closed_captions')}
-      <div class="helper">Required for video, animation and procedural demo content.</div>
+      <div class="helper">Recommended for video, animation and procedural demo content.</div>
     </div>
 
     <div class="field ${needsAlt ? '' : 'hidden'}" id="row_alt_text">
-      <label>Alt Text <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      <label>Alt Text <span class="badge badge-cond">conditional</span></label>
       <textarea name="alt_text" maxlength="500" oninput="saveInputs()">${state.data.alt_text||''}</textarea>
-      <div class="helper">Required for diagram and animation content. Max 500 characters.</div>
-      <div class="field-error" id="err_alt_text">Alt text is required for this content type.</div>
+      <div class="helper">Recommended for diagram and animation content. Max 500 characters.</div>
     </div>
 
     ${field('audio_narration', 'Audio Narration Available',
-      makeToggle('audio_narration'), 'Is an audio version available?', true)}
+      makeToggle('audio_narration'), 'Is an audio version available?')}
 
     ${field('screen_reader_compatible', 'Screen Reader Compatible',
       makeToggle('screen_reader_compatible'),
-      'Are all interactive elements labeled for screen readers?', true)}
+      'Are all interactive elements labeled for screen readers?')}
 
     ${field('mobile_optimized', 'Mobile Optimized',
       makeToggle('mobile_optimized'),
-      'Is this designed for a mobile viewport?', true)}
+      'Is this designed for a mobile viewport?')}
 
     ${field('transcript_file', 'Transcript File', `
       <div class="file-area" onclick="el('transcriptInput').click()">
@@ -1246,76 +1245,55 @@ function prevStep() {
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-function validateStep(idx) {
+function validateStep(idx, opts = {}) {
   const d = state.data
   let ok = true
+  const softLoWarn = opts.softLearningObjectiveWarn !== false
 
   function require(condition, msg) {
     if (!condition) { showAlert(msg); ok = false }
   }
 
   if (idx === 0) {
+    if (!state.editId) {
+      require(state.selectedFile, 'Please choose a file to upload.')
+    }
     require(d.title?.trim(), 'Title is required.')
     require(d.module_id, 'Module ID is required.')
     require(d.lesson_id?.trim(), 'Lesson ID is required.')
     require(d.content_type, 'Content type is required.')
-    require(d.author_source?.trim(), 'Author / source is required.')
-    require((d.language_versions || []).length > 0, 'At least one language version is required.')
   }
   if (idx === 1) {
     require((d.disease_relevance_tags || []).length > 0, 'At least one disease relevance tag is required.')
     require(d.concept_domain, 'Concept domain is required.')
     require(d.primary_concept?.trim(), 'Primary concept is required.')
-    require((d.secondary_concepts || []).length > 0, 'At least one secondary concept is required.')
   }
   if (idx === 2) {
-    require(d.explanation_role, 'Explanation role is required.')
-    require(d.sequence_position, 'Sequence position is required.')
-    require(d.learning_objective?.trim(), 'Learning objective is required.')
-    require(d.bloom_level, "Bloom's level is required.")
-    require(d.object_granularity, 'Object granularity is required.')
     if (d.can_stand_alone === false) {
       require((d.prerequisite_concept_ids || []).length > 0,
         'This asset cannot stand alone — please add at least one prerequisite asset.')
     }
-    // Soft warning for learning objective verb
-    const obj = (d.learning_objective || '').trim()
-    const startsWithVerb = obj && obj[0] === obj[0].toUpperCase()
-    if (obj && !startsWithVerb) {
-      showAlert("⚠️ Learning objectives should start with an action verb (e.g. 'Explain', 'Identify'). You can still continue.")
+    if (softLoWarn) {
+      const obj = (d.learning_objective || '').trim()
+      const startsWithVerb = obj && obj[0] === obj[0].toUpperCase()
+      if (obj && !startsWithVerb) {
+        showAlert("⚠️ Learning objectives should start with an action verb (e.g. 'Explain', 'Identify'). You can still continue.")
+      }
     }
   }
   if (idx === 3) {
     require((d.target_audience || []).length > 0, 'At least one target audience is required.')
     require(d.health_literacy_level, 'Health literacy level is required.')
     require(d.medical_terminology_level, 'Medical terminology level is required.')
-    require(d.modality_type, 'Modality type is required.')
   }
   if (idx === 4) {
     require((d.stress_state_compatibility || []).length > 0, 'At least one stress state is required.')
     require((d.parent_expertise_stage || []).length > 0, 'At least one parent expertise stage is required.')
     require((d.care_journey_stage || []).length > 0, 'At least one care journey stage is required.')
-    require(d.cognitive_load_rating, 'Cognitive load rating is required.')
-    require(d.element_interactivity, 'Element interactivity is required.')
-  }
-  if (idx === 5) {
-    require(d.emotional_tone, 'Emotional tone is required.')
-    require(d.emotional_sensitivity_level, 'Emotional sensitivity level is required.')
   }
   if (idx === 6) {
     require((d.parent_question_patterns || []).length >= 2, 'Please add at least 2 parent question patterns.')
-    require(d.intent_type, 'Intent type is required.')
-    require(d.response_type, 'Response type is required.')
     require((d.keyword_triggers || []).length >= 3, 'Please add at least 3 keyword triggers.')
-  }
-  if (idx === 7) {
-    const ct = d.content_type || ''
-    if (['video_segment','animation','procedural_demo'].includes(ct)) {
-      require(d.closed_captions != null, 'Closed captions field is required for this content type.')
-    }
-    if (['diagram','animation'].includes(ct)) {
-      require(d.alt_text?.trim(), 'Alt text is required for this content type.')
-    }
   }
 
   return ok
@@ -1345,6 +1323,10 @@ function handleTranscriptSelect(input) {
 async function submitNewAsset() {
   saveInputs()
   hideAlert()
+
+  for (let i = 0; i <= 7; i++) {
+    if (!validateStep(i, { softLearningObjectiveWarn: false })) return
+  }
 
   const d = state.data
   const load   = d.cognitive_load_rating
@@ -1402,14 +1384,6 @@ state.data.decision_support_context = false
 state.data.isolation_acknowledgment = false
 state.data.audio_narration      = false
 state.data.closed_captions      = false
-
-// ─── Load existing assets for typeahead ──────────────────────
-async function loadAssets() {
-  try {
-    const res  = await fetch('/assets')
-    state.allAssets = await res.json()
-  } catch(e) { console.warn('Could not load assets for typeahead', e) }
-}
 
 // ─── Edit mode: load existing asset into state ────────────────
 async function loadEditAsset(id) {

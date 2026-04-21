@@ -53,16 +53,24 @@ app.post('/upload', upload.fields([
       return undefined
     }
 
+    const boolOr = (key, fallback) => {
+      const v = boolField(key)
+      return v === undefined ? fallback : v
+    }
+
+    const languageVersions = arr('language_versions')
+    const seqPos = parseInt(b.sequence_position, 10)
+
     const asset = new Asset({
       title:                  b.title,
       content_type:           b.content_type,
-      module_id:              parseInt(b.module_id),
+      module_id:              parseInt(b.module_id, 10),
       lesson_id:              b.lesson_id,
-      author_source:          b.author_source,
+      author_source:          (b.author_source && String(b.author_source).trim()) || '',
       version:                b.version || 'v1.0',
-      clinical_reviewed:      boolField('clinical_reviewed'),
-      plain_language_version: boolField('plain_language_version'),
-      language_versions:      arr('language_versions'),
+      clinical_reviewed:      boolOr('clinical_reviewed', false),
+      plain_language_version: boolOr('plain_language_version', false),
+      language_versions:      languageVersions.length ? languageVersions : ['en'],
 
       disease_relevance_tags: arr('disease_relevance_tags'),
       concept_domain:         b.concept_domain,
@@ -71,12 +79,12 @@ app.post('/upload', upload.fields([
       explains_symptom:       arr('explains_symptom'),
       explains_procedure:     arr('explains_procedure'),
 
-      explanation_role:       b.explanation_role,
-      sequence_position:      parseInt(b.sequence_position),
-      learning_objective:     b.learning_objective,
-      bloom_level:            b.bloom_level,
-      object_granularity:     b.object_granularity,
-      can_stand_alone:        boolField('can_stand_alone'),
+      explanation_role:       b.explanation_role || 'definition',
+      sequence_position:      Number.isFinite(seqPos) && seqPos >= 1 ? seqPos : 1,
+      learning_objective:     b.learning_objective || '',
+      bloom_level:            b.bloom_level || 'understand',
+      object_granularity:     b.object_granularity || 'meso',
+      can_stand_alone:        boolOr('can_stand_alone', true),
       prerequisite_concept_ids: arr('prerequisite_concept_ids'),
       next_concept_ids:         arr('next_concept_ids'),
       instructional_strategy:   arr('instructional_strategy'),
@@ -84,36 +92,36 @@ app.post('/upload', upload.fields([
       target_audience:           arr('target_audience'),
       health_literacy_level:     b.health_literacy_level,
       medical_terminology_level: b.medical_terminology_level,
-      reading_level_grade:       b.reading_level_grade ? parseInt(b.reading_level_grade) : undefined,
-      modality_type:             b.modality_type,
+      reading_level_grade:       b.reading_level_grade ? parseInt(b.reading_level_grade, 10) : undefined,
+      modality_type:             b.modality_type || 'audio_visual',
 
       stress_state_compatibility: arr('stress_state_compatibility'),
       parent_expertise_stage:     arr('parent_expertise_stage'),
       care_journey_stage:         arr('care_journey_stage'),
-      cognitive_load_rating:      b.cognitive_load_rating,
-      element_interactivity:      b.element_interactivity,
+      cognitive_load_rating:      b.cognitive_load_rating || 'medium',
+      element_interactivity:      b.element_interactivity || 'medium',
       appropriate_after_event:    arr('appropriate_after_event'),
       contraindicated_after_event: arr('contraindicated_after_event'),
       just_in_time_trigger:       b.just_in_time_trigger,
 
-      emotional_tone:              b.emotional_tone,
-      emotional_sensitivity_level: b.emotional_sensitivity_level,
-      includes_reassurance:        boolField('includes_reassurance'),
-      addresses_guilt_or_blame:    boolField('addresses_guilt_or_blame'),
-      decision_support_context:    boolField('decision_support_context'),
-      isolation_acknowledgment:    boolField('isolation_acknowledgment'),
+      emotional_tone:              b.emotional_tone || 'reassuring',
+      emotional_sensitivity_level: b.emotional_sensitivity_level || 'medium',
+      includes_reassurance:        boolOr('includes_reassurance', false),
+      addresses_guilt_or_blame:  boolOr('addresses_guilt_or_blame', false),
+      decision_support_context:    boolOr('decision_support_context', false),
+      isolation_acknowledgment:    boolOr('isolation_acknowledgment', false),
 
       parent_question_patterns: arr('parent_question_patterns'),
       query_synonyms:           arr('query_synonyms'),
-      intent_type:              b.intent_type,
-      response_type:            b.response_type,
+      intent_type:              b.intent_type || 'explain',
+      response_type:            b.response_type || 'explanation',
       keyword_triggers:         arr('keyword_triggers'),
 
       closed_captions:          boolField('closed_captions'),
       alt_text:                 b.alt_text,
-      audio_narration:          boolField('audio_narration'),
-      screen_reader_compatible: boolField('screen_reader_compatible') ?? true,
-      mobile_optimized:         boolField('mobile_optimized') ?? true,
+      audio_narration:          boolOr('audio_narration', false),
+      screen_reader_compatible: boolOr('screen_reader_compatible', true),
+      mobile_optimized:         boolOr('mobile_optimized', true),
 
       file_path:            req.files?.file?.[0]
                               ? `/uploads/${req.files.file[0].filename}` : null,
