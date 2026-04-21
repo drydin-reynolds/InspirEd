@@ -1348,8 +1348,8 @@ function handleTranscriptSelect(input) {
   chosen.classList.remove('hidden')
 }
 
-// ─── Submit ───────────────────────────────────────────────────────────────────
-async function submitAsset() {
+// ─── Submit (new asset — POST /upload) ───────────────────────────────────────
+async function submitNewAsset() {
   saveInputs()
   hideAlert()
 
@@ -1364,7 +1364,6 @@ async function submitAsset() {
   if (state.selectedFile)   formData.append('file', state.selectedFile)
   if (state.transcriptFile) formData.append('transcript', state.transcriptFile)
 
-  // Append all state fields
   Object.entries(d).forEach(([key, val]) => {
     if (val == null) return
     if (Array.isArray(val)) {
@@ -1472,10 +1471,12 @@ async function loadEditAsset(id) {
   }
 }
 
-// ─── Override submitAsset to handle edit mode ─────────────────
-const _originalSubmit = submitAsset
+// ─── Submit: new asset vs edit (PATCH) ───────────────────────
 async function submitAsset() {
-  if (!state.editId) { await _originalSubmit(); return }
+  if (!state.editId) {
+    await submitNewAsset()
+    return
+  }
 
   saveInputs()
   hideAlert()
