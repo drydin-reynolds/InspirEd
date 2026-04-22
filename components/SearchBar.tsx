@@ -33,7 +33,7 @@ export function SearchBar({
 
             <TextInput
                 value={value}
-                onChangeText={onChangeText}
+                onChangeText={(t) => { onChangeText(t) } }
                 placeholder={placeholder}
                 placeholderTextColor={theme.textSecondary}
                 style={[styles.input, { color: theme.text }]}

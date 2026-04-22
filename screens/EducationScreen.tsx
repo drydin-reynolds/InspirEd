@@ -13,6 +13,7 @@ import { useNavigation } from "@react-navigation/native";
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
 import { askEducationalQuestion } from "@/utils/gemini";
 import { SearchBar } from "@/components/SearchBar";
+import { assetToLearningModule } from "@/utils/assetConvertion"
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -26,6 +27,7 @@ export default function EducationScreen() {
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
+  const [results, setResults] = useState<any[]>([]);
 
   const completedCount = learningModules.filter((m) => m.completed).length;
   const totalCount = learningModules.length;
@@ -69,7 +71,21 @@ export default function EducationScreen() {
 
     addEducationChatMessage(aiMessage);
     setIsLoading(false);
-  };
+    };
+
+    const searchAssets = async (text: string) => {
+        if (!text.trim()) {
+            setResults([]);
+            return;
+        }
+        
+        const res = await fetch(
+            `http://10.205.227.129:3000/assets/search/query?q=${encodeURIComponent(text)}`
+        );
+
+        const data = await res.json();
+        setResults(data);
+    };
 
   if (showChat) {
     return (
@@ -155,10 +171,28 @@ export default function EducationScreen() {
       <View style={styles.container}>
         <SearchBar
             value={searchText}
-            onChangeText={setSearchText}
+            onChangeText={(t) => {
+                setSearchText(t);
+                searchAssets(t);
+            }}
             placeholder="Search modules..."
-            onClear={() => setSearchText("")}
+            onClear={() => {
+                setSearchText("");
+                setResults([]);
+            }}
         />
+
+        {results.map((item) => (
+            <ModuleCard
+                key={item._id}
+                module={assetToLearningModule(item)}
+                onPress={() => {
+                    navigation.navigate("ModuleDetail", {
+                        moduleId: item._id,
+                    });
+                }}
+            />
+        ))}
         
         <View style={styles.actionButtons}>
           <Button
@@ -568,4 +602,13 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "500",
   },
+  searchResults: {
+      marginTop: 8,
+      gap: 12, 
+  },
+  searchItem: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "#eee",
+  }
 });
