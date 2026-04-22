@@ -14,6 +14,23 @@
       min-height: 100vh;
     }
 
+    /* Nav (matches browse.html) */
+    .nav {
+      background: #fff; border-bottom: 1px solid #e5e7eb;
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .nav-brand { font-size: 16px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 8px; }
+    .nav-links  { display: flex; gap: 8px; }
+    .nav-link {
+      padding: 6px 14px; border-radius: 6px; font-size: 14px;
+      font-weight: 500; text-decoration: none; color: #6b7280;
+      transition: all .15s;
+    }
+    .nav-link:hover   { background: #f3f4f6; color: #111827; }
+    .nav-link.active  { background: #eff6ff; color: #2563eb; }
+
     .app { max-width: 780px; margin: 0 auto; padding: 32px 20px 80px; }
 
     /* Progress bar */
@@ -241,8 +258,8 @@
       font-size: 13px; color: #92400e; margin-bottom: 12px;
     }
 
-    /* Navigation */
-    .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+    /* Prev / Next row inside wizard cards (class name avoids clashing with site header .nav) */
+    .wizard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
     .btn {
       padding: 10px 24px; border-radius: 8px; font-size: 14px;
       font-weight: 600; cursor: pointer; border: none; transition: all .15s;
@@ -271,6 +288,16 @@
   </style>
 </head>
 <body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-brand">📚 Asset Library</div>
+  <div class="nav-links">
+    <a href="/" class="nav-link active">Upload</a>
+    <a href="/browse.html" class="nav-link">Browse</a>
+  </div>
+</nav>
+
 <div class="app">
 
   <!-- Progress -->
@@ -1093,7 +1120,7 @@ function renderStep1() {
         {value:'zh',label:'Chinese'},{value:'other',label:'Other'}
       ]), 'Default: English. Select all that apply.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <div></div>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1142,7 +1169,7 @@ function renderStep2() {
       makeTagInput('explains_procedure', 'e.g. pulse oximetry monitoring — press Enter…'),
       'Procedures this content helps parents understand.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1224,7 +1251,7 @@ function renderStep3() {
         {value:'signaling',          label:'Signaling',            desc:'Highlight key information'}
       ]), 'Which CTML principles were applied?')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1282,7 +1309,7 @@ function renderStep4() {
         ).join('')}
       </select>`, 'What sensory channels does this content use?')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1369,7 +1396,7 @@ function renderStep5() {
       `<input type="text" name="just_in_time_trigger" value="${state.data.just_in_time_trigger||''}"
         oninput="saveInputs()">`, '')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1412,7 +1439,7 @@ function renderStep6() {
     ${field('isolation_acknowledgment', 'Isolation Acknowledgment',
       makeToggle('isolation_acknowledgment'), '')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1457,7 +1484,7 @@ function renderStep7() {
       'Single words or short phrases that should surface this content. Minimum 3 required.', true,
       '', 'Please add at least 3 keyword triggers.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1508,7 +1535,7 @@ function renderStep8() {
         <div class="file-chosen hidden" id="transcriptChosen"></div>
       </div>`, 'Optional. Processed separately by the ingest pipeline after submission.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Review →</button>
     </div>
@@ -1633,7 +1660,7 @@ function renderReview() {
         'Uses the asset-admin server and GEMINI_API_KEY to chunk and embed text for the mobile AI Learning Assistant.', false)}
     </div>
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-success" onclick="submitAsset()">Submit Asset ✓</button>
     </div>
