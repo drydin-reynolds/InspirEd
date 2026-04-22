@@ -14,6 +14,23 @@
       min-height: 100vh;
     }
 
+    /* Nav (matches browse.html) */
+    .nav {
+      background: #fff; border-bottom: 1px solid #e5e7eb;
+      padding: 0 32px; height: 56px;
+      display: flex; align-items: center; justify-content: space-between;
+      position: sticky; top: 0; z-index: 50;
+    }
+    .nav-brand { font-size: 16px; font-weight: 700; color: #111827; display: flex; align-items: center; gap: 8px; }
+    .nav-links  { display: flex; gap: 8px; }
+    .nav-link {
+      padding: 6px 14px; border-radius: 6px; font-size: 14px;
+      font-weight: 500; text-decoration: none; color: #6b7280;
+      transition: all .15s;
+    }
+    .nav-link:hover   { background: #f3f4f6; color: #111827; }
+    .nav-link.active  { background: #eff6ff; color: #2563eb; }
+
     .app { max-width: 780px; margin: 0 auto; padding: 32px 20px 80px; }
 
     /* Progress bar */
@@ -47,6 +64,16 @@
       margin-bottom: 24px; line-height: 1.5;
     }
     .banner-warning strong { display: block; margin-bottom: 4px; font-size: 14px; }
+
+    .banner-info {
+      background: #eff6ff; border: 1px solid #93c5fd;
+      border-radius: 8px; padding: 14px 16px;
+      font-size: 13px; color: #1e3a8a;
+      margin-bottom: 24px; line-height: 1.5;
+    }
+    .banner-info strong { display: block; margin-bottom: 6px; font-size: 14px; color: #1e40af; }
+    .banner-info ul { margin: 6px 0 0 18px; max-height: 160px; overflow-y: auto; }
+    .banner-info .banner-actions { margin-top: 10px; }
 
     /* Field groups */
     .field { margin-bottom: 22px; }
@@ -231,8 +258,8 @@
       font-size: 13px; color: #92400e; margin-bottom: 12px;
     }
 
-    /* Navigation */
-    .nav { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
+    /* Prev / Next row inside wizard cards (class name avoids clashing with site header .nav) */
+    .wizard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 32px; }
     .btn {
       padding: 10px 24px; border-radius: 8px; font-size: 14px;
       font-weight: 600; cursor: pointer; border: none; transition: all .15s;
@@ -261,6 +288,16 @@
   </style>
 </head>
 <body>
+
+<!-- Nav -->
+<nav class="nav">
+  <div class="nav-brand">📚 Asset Library</div>
+  <div class="nav-links">
+    <a href="/" class="nav-link active">Upload</a>
+    <a href="/browse.html" class="nav-link">Browse</a>
+  </div>
+</nav>
+
 <div class="app">
 
   <!-- Progress -->
@@ -282,7 +319,9 @@
 const state = {
   currentStep: 0,
   data: {},
-  allAssets: []   // for typeahead
+  allAssets: [],   // for typeahead
+  metadataImportReport: null, // { unknownPaths, skippedValues, unresolvedRefs, dismissed }
+  metadataJsonFileName: null,
 }
 
 // ─── Step definitions ─────────────────────────────────────────────────────────
@@ -297,6 +336,422 @@ const STEPS = [
   { id: 'access',       label: 'Accessibility' },
   { id: 'review',       label: 'Review' },
 ]
+
+// ─── Metadata JSON import (client-side; not posted to server) ────────────────
+// Paths listed in METADATA_IGNORE_PATHS are accepted and omitted from “unknown”
+// (e.g. asset_id / file_path are set by the app on upload, not the wizard).
+const METADATA_IGNORE_PATHS = new Set([
+  'asset_id', 'created_at', 'updated_at', 'schema_version', '_id',
+  'identification.file_path',
+  'identification.date_created',
+  'transcript_available',
+  'identification.transcript_available',
+])
+
+const METADATA_ENUMS = {
+  content_type: ['animation','video_segment','diagram','text_explanation','analogy','glossary_entry','case_example','procedural_demo'],
+  concept_domain: ['lung_biology','genetics','treatment','diagnosis','home_care','psychosocial'],
+  disease_relevance_tags: ['SFTPC mutation','SFTPB deficiency','ABCA3 deficiency','general chILD'],
+  explanation_role: ['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up'],
+  bloom_level: ['remember','understand','apply','analyze','evaluate','create'],
+  object_granularity: ['micro','meso','macro'],
+  instructional_strategy: ['segmenting','spatial_contiguity','personalization','modality','coherence','signaling'],
+  language_versions: ['en','es','fr','pt','zh','other'],
+  target_audience: ['caregiver_parent','teen_patient','adult_patient','extended_family','school_staff'],
+  health_literacy_level: ['foundational','functional','interactive','critical','contributory'],
+  medical_terminology_level: ['none','minimal','moderate','clinical'],
+  modality_type: ['visual_only','audio_only','audio_visual','text_only','interactive'],
+  stress_state_compatibility: ['baseline_calm','mild_concern','moderate_stress','acute_crisis','post_bad_news','post_hospitalization'],
+  parent_expertise_stage: ['novice','emerging','developing','proficient','expert_contributor'],
+  care_journey_stage: ['pre_diagnosis','diagnosis','acute_management','home_management','advanced_planning'],
+  cognitive_load_rating: ['low','medium','high'],
+  element_interactivity: ['low','medium','high'],
+  emotional_tone: ['reassuring','matter_of_fact','empowering','cautionary','validating'],
+  emotional_sensitivity_level: ['low','medium','high','critical'],
+  intent_type: ['explain','reassure','define','compare','decide','procedure_how_to','prognosis'],
+  response_type: ['explanation','definition','analogy','reassurance','decision_support','step_by_step'],
+}
+
+const METADATA_PATH_ALIASES = {
+  'identification.title': 'title',
+  'identification.content_type': 'content_type',
+  'identification.module_id': 'module_id',
+  'identification.lesson_id': 'lesson_id',
+  'identification.author_source': 'author_source',
+  'identification.version': 'version',
+  'identification.clinical_reviewed': 'clinical_reviewed',
+  'concept_graph.primary_concept': 'primary_concept',
+  'concept_graph.secondary_concepts': 'secondary_concepts',
+  'concept_graph.prerequisite_concept_ids': 'prerequisite_concept_ids',
+  'concept_graph.next_concept_ids': 'next_concept_ids',
+  'concept_graph.disease_relevance_tags': 'disease_relevance_tags',
+  'concept_graph.concept_domain': 'concept_domain',
+  'concept_graph.explains_symptom': 'explains_symptom',
+  'concept_graph.explains_procedure': 'explains_procedure',
+  'audience.target_audience': 'target_audience',
+  'audience.reading_level_grade': 'reading_level_grade',
+  'audience.health_literacy_level': 'health_literacy_level',
+  'audience.medical_terminology_level': 'medical_terminology_level',
+  'audience.language_versions': 'language_versions',
+  'audience.plain_language_version': 'plain_language_version',
+  'accessibility.closed_captions': 'closed_captions',
+  'accessibility.alt_text': 'alt_text',
+  'accessibility.audio_narration': 'audio_narration',
+  'accessibility.screen_reader_compatible': 'screen_reader_compatible',
+  'accessibility.mobile_optimized': 'mobile_optimized',
+  'nlp_intent.parent_question_patterns': 'parent_question_patterns',
+  'nlp_intent.query_synonyms': 'query_synonyms',
+  'nlp_intent.intent_type': 'intent_type',
+  'nlp_intent.response_type': 'response_type',
+  'nlp_intent.keyword_triggers': 'keyword_triggers',
+  'pedagogy.explanation_role': 'explanation_role',
+  'pedagogy.sequence_position': 'sequence_position',
+  'pedagogy.learning_objective': 'learning_objective',
+  'pedagogy.bloom_level': 'bloom_level',
+  'pedagogy.instructional_strategy': 'instructional_strategy',
+  'pedagogy.modality_type': 'modality_type',
+  'pedagogy.object_granularity': 'object_granularity',
+  'pedagogy.can_stand_alone': 'can_stand_alone',
+  'adaptive_delivery.stress_state_compatibility': 'stress_state_compatibility',
+  'adaptive_delivery.parent_expertise_stage': 'parent_expertise_stage',
+  'adaptive_delivery.care_journey_stage': 'care_journey_stage',
+  'adaptive_delivery.cognitive_load_rating': 'cognitive_load_rating',
+  'adaptive_delivery.element_interactivity': 'element_interactivity',
+  'adaptive_delivery.appropriate_after_event': 'appropriate_after_event',
+  'adaptive_delivery.contraindicated_after_event': 'contraindicated_after_event',
+  'adaptive_delivery.just_in_time_trigger': 'just_in_time_trigger',
+  'psychosocial.emotional_tone': 'emotional_tone',
+  'psychosocial.emotional_sensitivity_level': 'emotional_sensitivity_level',
+  'psychosocial.includes_reassurance': 'includes_reassurance',
+  'psychosocial.addresses_guilt_or_blame': 'addresses_guilt_or_blame',
+  'psychosocial.decision_support_context': 'decision_support_context',
+  'psychosocial.isolation_acknowledgment': 'isolation_acknowledgment',
+}
+
+const METADATA_TOPLEVEL_WIZARD_KEYS = new Set([
+  'title','content_type','module_id','lesson_id','author_source','version',
+  'clinical_reviewed','plain_language_version','language_versions',
+  'disease_relevance_tags','concept_domain','primary_concept','secondary_concepts',
+  'explains_symptom','explains_procedure',
+  'explanation_role','sequence_position','learning_objective','bloom_level',
+  'object_granularity','can_stand_alone','prerequisite_concept_ids','next_concept_ids',
+  'instructional_strategy',
+  'target_audience','health_literacy_level','medical_terminology_level',
+  'reading_level_grade','modality_type',
+  'stress_state_compatibility','parent_expertise_stage','care_journey_stage',
+  'cognitive_load_rating','element_interactivity','appropriate_after_event',
+  'contraindicated_after_event','just_in_time_trigger',
+  'emotional_tone','emotional_sensitivity_level','includes_reassurance',
+  'addresses_guilt_or_blame','decision_support_context','isolation_acknowledgment',
+  'parent_question_patterns','query_synonyms','intent_type','response_type','keyword_triggers',
+  'closed_captions','alt_text','audio_narration','screen_reader_compatible','mobile_optimized',
+])
+
+function normalizeMetadataLeaf(v) {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'object' && !Array.isArray(v)) {
+    if ('$date' in v) {
+      const d = v.$date
+      if (typeof d === 'string') return d
+      if (typeof d === 'number') return new Date(d).toISOString()
+      return null
+    }
+    if ('$oid' in v) return String(v.$oid)
+  }
+  return v
+}
+
+function normalizeMetadataDeep(v) {
+  if (v === null || v === undefined) return null
+  if (Array.isArray(v)) return v.map(normalizeMetadataDeep)
+  const n = normalizeMetadataLeaf(v)
+  if (n !== v && typeof v === 'object' && !Array.isArray(v)) return n
+  return v
+}
+
+function flattenMetadataLeaves(obj, prefix = '') {
+  const out = new Map()
+  function walk(o, p) {
+    if (o === null || o === undefined) {
+      out.set(p, null)
+      return
+    }
+    if (typeof o === 'object' && !Array.isArray(o) && o !== null) {
+      if ('$date' in o || '$oid' in o) {
+        out.set(p, normalizeMetadataLeaf(o))
+        return
+      }
+    }
+    if (Array.isArray(o)) {
+      out.set(p, normalizeMetadataDeep(o))
+      return
+    }
+    if (typeof o !== 'object') {
+      out.set(p, o)
+      return
+    }
+    const keys = Object.keys(o)
+    if (keys.length === 0) return
+    for (const k of keys) {
+      const path = p ? `${p}.${k}` : k
+      const child = o[k]
+      if (child === null || child === undefined) {
+        out.set(path, null)
+      } else if (typeof child === 'object' && !Array.isArray(child) && child !== null) {
+        if ('$date' in child || '$oid' in child) {
+          out.set(path, normalizeMetadataLeaf(child))
+        } else {
+          walk(child, path)
+        }
+      } else if (Array.isArray(child)) {
+        out.set(path, normalizeMetadataDeep(child))
+      } else {
+        out.set(path, child)
+      }
+    }
+  }
+  walk(obj, prefix)
+  return out
+}
+
+function coerceBool(v) {
+  if (v === null || v === undefined) return null
+  if (typeof v === 'boolean') return v
+  if (v === 'true' || v === '1') return true
+  if (v === 'false' || v === '0') return false
+  return null
+}
+
+function mergeMetadataField(field, raw, skippedValues) {
+  if (raw === null || raw === undefined) return false
+
+  const boolFields = new Set([
+    'clinical_reviewed','plain_language_version','can_stand_alone',
+    'includes_reassurance','addresses_guilt_or_blame','decision_support_context',
+    'isolation_acknowledgment','audio_narration','screen_reader_compatible',
+    'mobile_optimized','closed_captions',
+  ])
+  if (boolFields.has(field)) {
+    const b = coerceBool(raw)
+    if (b === null) return false
+    state.data[field] = b
+    return true
+  }
+
+  if (field === 'module_id') {
+    const n = parseInt(raw, 10)
+    if (!Number.isFinite(n) || n < 1 || n > 99) {
+      skippedValues.push(`${field}: ${JSON.stringify(raw)}`)
+      return true
+    }
+    state.data[field] = n
+    return true
+  }
+
+  if (field === 'sequence_position' || field === 'reading_level_grade') {
+    const n = parseInt(raw, 10)
+    if (!Number.isFinite(n)) {
+      skippedValues.push(`${field}: ${JSON.stringify(raw)}`)
+      return true
+    }
+    if (field === 'reading_level_grade' && (n < 1 || n > 16)) {
+      skippedValues.push(`${field}: ${n} (expected 1–16)`)
+      return true
+    }
+    if (field === 'sequence_position' && n < 1) {
+      skippedValues.push(`${field}: ${n}`)
+      return true
+    }
+    state.data[field] = n
+    return true
+  }
+
+  if (field === 'lesson_id' || field === 'title' || field === 'author_source' ||
+      field === 'version' || field === 'learning_objective' || field === 'just_in_time_trigger' ||
+      field === 'primary_concept' || field === 'alt_text') {
+    state.data[field] = String(raw).trim()
+    return true
+  }
+
+  const arrayStringFields = new Set([
+    'secondary_concepts','explains_symptom','explains_procedure','appropriate_after_event',
+    'contraindicated_after_event','parent_question_patterns','query_synonyms','keyword_triggers',
+  ])
+  if (arrayStringFields.has(field)) {
+    const arr = Array.isArray(raw) ? raw : [raw]
+    state.data[field] = arr.map(x => String(x).trim()).filter(Boolean)
+    return true
+  }
+
+  const enumArrayFields = new Set([
+    'language_versions','disease_relevance_tags','instructional_strategy','target_audience',
+    'stress_state_compatibility','parent_expertise_stage','care_journey_stage',
+  ])
+  if (enumArrayFields.has(field)) {
+    const allowed = new Set(METADATA_ENUMS[field] || [])
+    const arr = Array.isArray(raw) ? raw : [raw]
+    const kept = []
+    for (const x of arr) {
+      const s = String(x).trim()
+      if (!s) continue
+      if (allowed.has(s)) kept.push(s)
+      else skippedValues.push(`${field}: ${s}`)
+    }
+    if (kept.length) state.data[field] = kept
+    return true
+  }
+
+  if (METADATA_ENUMS[field]) {
+    const s = String(raw).trim()
+    if (!METADATA_ENUMS[field].includes(s)) {
+      skippedValues.push(`${field}: ${s}`)
+      return true
+    }
+    state.data[field] = s
+    return true
+  }
+
+  if (field === 'prerequisite_concept_ids' || field === 'next_concept_ids') {
+    const arr = Array.isArray(raw) ? raw : [raw]
+    state.data[field] = arr.map(x => {
+      if (typeof x === 'object' && x && '$oid' in x) return String(x.$oid)
+      return String(x).trim()
+    }).filter(Boolean)
+    return true
+  }
+
+  return false
+}
+
+function escapeHtml(s) {
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+function resolveMetadataRefArrays(unresolvedRefs) {
+  const fields = ['prerequisite_concept_ids', 'next_concept_ids']
+  for (const f of fields) {
+    const arr = state.data[f]
+    if (!Array.isArray(arr) || !arr.length) continue
+    const out = []
+    for (const item of arr) {
+      const s = String(item).trim()
+      if (!s) continue
+      if (/^[a-fA-F0-9]{24}$/.test(s)) {
+        out.push(s)
+        continue
+      }
+      const found = state.allAssets.find(a => a.asset_id === s)
+      if (found) out.push(String(found._id))
+      else unresolvedRefs.push(`${f}: ${s}`)
+    }
+    state.data[f] = out
+  }
+}
+
+function renderMetadataImportBanner() {
+  const rep = state.metadataImportReport
+  if (!rep || rep.dismissed) return ''
+  const parts = []
+  if (rep.unknownPaths?.length) {
+    parts.push(`<strong>JSON paths not used by this wizard</strong><ul>${rep.unknownPaths.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join('')}</ul>`)
+  }
+  if (rep.skippedValues?.length) {
+    parts.push(`<strong>Values skipped (invalid or not allowed)</strong><ul>${rep.skippedValues.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join('')}</ul>`)
+  }
+  if (rep.unresolvedRefs?.length) {
+    parts.push(`<strong>References not linked (no matching asset in library)</strong><ul>${rep.unresolvedRefs.map(p => `<li><code>${escapeHtml(p)}</code></li>`).join('')}</ul>`)
+  }
+  if (!parts.length) return ''
+  return `<div class="banner-info" id="metadataImportBanner">
+    ${parts.join('')}
+    <div class="banner-actions">
+      <button type="button" class="btn btn-secondary" onclick="dismissMetadataImportBanner()">Dismiss</button>
+    </div>
+  </div>`
+}
+
+function dismissMetadataImportBanner() {
+  if (state.metadataImportReport) state.metadataImportReport.dismissed = true
+  renderStep(state.currentStep)
+}
+
+function applyMetadataJson(parsed) {
+  const flat = flattenMetadataLeaves(parsed)
+  const consumed = new Set()
+  for (const p of METADATA_IGNORE_PATHS) {
+    if (flat.has(p)) consumed.add(p)
+  }
+
+  const skippedValues = []
+  const unresolvedRefs = []
+
+  function take(path, field) {
+    if (!flat.has(path)) return
+    const raw = flat.get(path)
+    consumed.add(path)
+    mergeMetadataField(field, raw, skippedValues)
+  }
+
+  for (const [path, field] of Object.entries(METADATA_PATH_ALIASES)) {
+    take(path, field)
+  }
+
+  for (const [path, val] of flat.entries()) {
+    if (consumed.has(path)) continue
+    if (!path.includes('.') && METADATA_TOPLEVEL_WIZARD_KEYS.has(path)) {
+      consumed.add(path)
+      mergeMetadataField(path, val, skippedValues)
+    }
+  }
+
+  resolveMetadataRefArrays(unresolvedRefs)
+
+  const unknownPaths = []
+  for (const path of flat.keys()) {
+    if (consumed.has(path)) continue
+    unknownPaths.push(path)
+  }
+  unknownPaths.sort()
+
+  if (!unknownPaths.length && !skippedValues.length && !unresolvedRefs.length) {
+    state.metadataImportReport = null
+  } else {
+    state.metadataImportReport = {
+      unknownPaths,
+      skippedValues,
+      unresolvedRefs,
+      dismissed: false,
+    }
+  }
+}
+
+async function handleMetadataJsonSelect(input) {
+  const file = input.files && input.files[0]
+  if (!file) return
+  hideAlert()
+  const reader = new FileReader()
+  reader.onload = async () => {
+    try {
+      const parsed = JSON.parse(reader.result)
+      await loadAssets()
+      applyMetadataJson(parsed)
+      state.metadataJsonFileName = file.name
+      renderStep(state.currentStep)
+      updateAssetIdPreview()
+      handleConditionals()
+    } catch (e) {
+      showAlert('Metadata JSON: ' + (e instanceof SyntaxError ? 'invalid JSON — ' + e.message : e.message))
+      input.value = ''
+      state.metadataJsonFileName = null
+      renderStep(state.currentStep)
+    }
+  }
+  reader.readAsText(file)
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function el(id) { return document.getElementById(id) }
@@ -558,7 +1013,8 @@ function renderStep(idx) {
     renderStep1, renderStep2, renderStep3, renderStep4,
     renderStep5, renderStep6, renderStep7, renderStep8, renderReview
   ]
-  container.innerHTML = renderers[idx]()
+  const banner = renderMetadataImportBanner()
+  container.innerHTML = banner + renderers[idx]()
   handleConditionals()
   updateProgress()
 }
@@ -595,6 +1051,19 @@ function renderStep1() {
         <div class="file-chosen hidden" id="fileChosen"></div>
       </div>`, 'File will be stored locally. Sets file_path on success.', true)}
 
+    ${field('metadata_json', 'Metadata JSON (optional)', `
+      <div class="file-area" onclick="el('metadataJsonInput').click()">
+        <input type="file" id="metadataJsonInput" accept=".json,application/json"
+          onchange="handleMetadataJsonSelect(this)">
+        <div class="file-icon">📄</div>
+        <div class="file-label">Click to choose a metadata JSON file</div>
+        <div class="file-sub">Populate the wizard from a file (e.g. Claude-generated). Not uploaded to the server.</div>
+        <div class="file-chosen ${state.metadataJsonFileName ? '' : 'hidden'}" id="metadataJsonChosen">
+          ${state.metadataJsonFileName ? '✓ ' + escapeHtml(state.metadataJsonFileName) : ''}
+        </div>
+      </div>`,
+      'Nested export format (identification, concept_graph, audience, …) and flat keys are supported. Unknown JSON paths are listed after import; required fields stay enforced when you use Next and on submit.')}
+
     ${field('asset_id', 'Asset ID', `
       <div class="read-only-display" id="asset_id_preview">
         Fill in module, lesson and content type above
@@ -629,29 +1098,29 @@ function renderStep1() {
     ${field('author_source', 'Author / Source',
       `<input type="text" name="author_source" value="${state.data.author_source||''}"
         oninput="saveInputs()">`,
-      'Who created or clinically reviewed this content?', true)}
+      'Who created or clinically reviewed this content?')}
 
     ${field('version', 'Version',
       `<input type="text" name="version" value="${state.data.version||'v1.0'}"
         oninput="saveInputs()">`,
-      'Leave as v1.0 for new content.', true)}
+      'Leave as v1.0 for new content.')}
 
     ${field('clinical_reviewed', 'Clinically Reviewed',
       makeToggle('clinical_reviewed'),
-      'Has a chILD physician reviewed this content for accuracy?', true)}
+      'Has a chILD physician reviewed this content for accuracy?')}
 
     ${field('plain_language_version', 'Plain Language Version',
       makeToggle('plain_language_version'),
-      'Has a simplified-language version been created?', true)}
+      'Has a simplified-language version been created?')}
 
     ${field('language_versions', 'Language Versions',
       makeChips('language_versions', [
         {value:'en',label:'English'},{value:'es',label:'Spanish'},
         {value:'fr',label:'French'},{value:'pt',label:'Portuguese'},
         {value:'zh',label:'Chinese'},{value:'other',label:'Other'}
-      ]), 'Default: English. Select all that apply.', true)}
+      ]), 'Default: English. Select all that apply.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <div></div>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -690,7 +1159,7 @@ function renderStep2() {
 
     ${field('secondary_concepts', 'Secondary Concepts',
       makeTagInput('secondary_concepts', 'Type and press Enter…'),
-      'Supporting concepts explained in this object.', true)}
+      'Supporting concepts explained in this object.')}
 
     ${field('explains_symptom', 'Explains Symptom',
       makeTagInput('explains_symptom', 'e.g. rapid breathing — press Enter…'),
@@ -700,7 +1169,7 @@ function renderStep2() {
       makeTagInput('explains_procedure', 'e.g. pulse oximetry monitoring — press Enter…'),
       'Procedures this content helps parents understand.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -721,18 +1190,18 @@ function renderStep3() {
         ${['definition','mechanism','analogy','visual_example','clinical_application','summary','follow_up'].map(v =>
           `<option value="${v}" ${state.data.explanation_role===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, 'Where does this object fit in a teaching sequence?', true)}
+      </select>`, 'Where does this object fit in a teaching sequence?')}
 
     ${field('sequence_position', 'Sequence Position',
       `<input type="number" name="sequence_position" min="1" value="${state.data.sequence_position||''}"
         oninput="saveInputs()">`,
-      'Position in the concept sequence. 1 = first.', true)}
+      'Position in the concept sequence. 1 = first.')}
 
     ${field('learning_objective', 'Learning Objective',
       `<input type="text" name="learning_objective" value="${state.data.learning_objective||''}"
         placeholder="e.g. Explain how surfactant reduces surface tension…" oninput="saveInputs()">`,
-      "Single sentence starting with a Bloom's verb.", true,
-      '', '', "Learning objectives should start with an action verb (e.g. 'Explain', 'Identify', 'Describe').")}
+      "Single sentence starting with a Bloom's verb.",
+      false, '', '', "Learning objectives should start with an action verb (e.g. 'Explain', 'Identify', 'Describe').")}
 
     ${field('bloom_level', 'Bloom\'s Level', `
       <select name="bloom_level" onchange="saveInputs()">
@@ -745,7 +1214,7 @@ function renderStep3() {
           {v:'evaluate',d:'Make judgements'},
           {v:'create',d:'Produce something new'}
         ].map(o => `<option value="${o.v}" ${state.data.bloom_level===o.v?'selected':''}>${o.v} — ${o.d}</option>`).join('')}
-      </select>`, "Select the cognitive level this content targets.", true)}
+      </select>`, "Select the cognitive level this content targets.")}
 
     ${field('object_granularity', 'Object Granularity', `
       <select name="object_granularity" onchange="saveInputs()">
@@ -753,7 +1222,7 @@ function renderStep3() {
         <option value="micro"  ${state.data.object_granularity==='micro' ?'selected':''}>Micro — single fact</option>
         <option value="meso"   ${state.data.object_granularity==='meso'  ?'selected':''}>Meso — single concept</option>
         <option value="macro"  ${state.data.object_granularity==='macro' ?'selected':''}>Macro — concept cluster</option>
-      </select>`, 'How much does this object cover?', true)}
+      </select>`, 'How much does this object cover?')}
 
     ${field('can_stand_alone', 'Can Stand Alone',
       makeToggle('can_stand_alone'),
@@ -782,7 +1251,7 @@ function renderStep3() {
         {value:'signaling',          label:'Signaling',            desc:'Highlight key information'}
       ]), 'Which CTML principles were applied?')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -838,9 +1307,9 @@ function renderStep4() {
         ${['visual_only','audio_only','audio_visual','text_only','interactive'].map(v =>
           `<option value="${v}" ${state.data.modality_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, 'What sensory channels does this content use?', true)}
+      </select>`, 'What sensory channels does this content use?')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -905,7 +1374,7 @@ function renderStep5() {
         <option value="low"    ${state.data.cognitive_load_rating==='low'   ?'selected':''}>Low — 1 concept</option>
         <option value="medium" ${state.data.cognitive_load_rating==='medium'?'selected':''}>Medium — 2–3 concepts</option>
         <option value="high"   ${state.data.cognitive_load_rating==='high'  ?'selected':''}>High — 4+ interacting concepts</option>
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('element_interactivity', 'Element Interactivity', `
       <select name="element_interactivity" onchange="saveInputs()">
@@ -913,7 +1382,7 @@ function renderStep5() {
         <option value="low"    ${state.data.element_interactivity==='low'   ?'selected':''}>Low — 1–2 elements</option>
         <option value="medium" ${state.data.element_interactivity==='medium'?'selected':''}>Medium — 3–4 elements</option>
         <option value="high"   ${state.data.element_interactivity==='high'  ?'selected':''}>High — 5+ elements</option>
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('appropriate_after_event', 'Appropriate After Event',
       makeTagInput('appropriate_after_event', 'e.g. initial_diagnosis_appointment — press Enter…'),
@@ -927,7 +1396,7 @@ function renderStep5() {
       `<input type="text" name="just_in_time_trigger" value="${state.data.just_in_time_trigger||''}"
         oninput="saveInputs()">`, '')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -948,7 +1417,7 @@ function renderStep6() {
         ${['reassuring','matter_of_fact','empowering','cautionary','validating'].map(v =>
           `<option value="${v}" ${state.data.emotional_tone===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('emotional_sensitivity_level', 'Emotional Sensitivity Level', `
       <select name="emotional_sensitivity_level" onchange="saveInputs()">
@@ -956,21 +1425,21 @@ function renderStep6() {
         ${['low','medium','high','critical'].map(v =>
           `<option value="${v}" ${state.data.emotional_sensitivity_level===v?'selected':''}>${v}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('includes_reassurance', 'Includes Reassurance',
-      makeToggle('includes_reassurance'), '', true)}
+      makeToggle('includes_reassurance'), '')}
 
     ${field('addresses_guilt_or_blame', 'Addresses Guilt or Blame',
-      makeToggle('addresses_guilt_or_blame'), '', true)}
+      makeToggle('addresses_guilt_or_blame'), '')}
 
     ${field('decision_support_context', 'Decision Support Context',
-      makeToggle('decision_support_context'), '', true)}
+      makeToggle('decision_support_context'), '')}
 
     ${field('isolation_acknowledgment', 'Isolation Acknowledgment',
-      makeToggle('isolation_acknowledgment'), '', true)}
+      makeToggle('isolation_acknowledgment'), '')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1000,7 +1469,7 @@ function renderStep7() {
         ${['explain','reassure','define','compare','decide','procedure_how_to','prognosis'].map(v =>
           `<option value="${v}" ${state.data.intent_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('response_type', 'Response Type', `
       <select name="response_type" onchange="saveInputs()">
@@ -1008,14 +1477,14 @@ function renderStep7() {
         ${['explanation','definition','analogy','reassurance','decision_support','step_by_step'].map(v =>
           `<option value="${v}" ${state.data.response_type===v?'selected':''}>${v.replace(/_/g,' ')}</option>`
         ).join('')}
-      </select>`, '', true)}
+      </select>`, '')}
 
     ${field('keyword_triggers', 'Keyword Triggers',
       makeTagInput('keyword_triggers', 'Single word or short phrase — press Enter…'),
       'Single words or short phrases that should surface this content. Minimum 3 required.', true,
       '', 'Please add at least 3 keyword triggers.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Next →</button>
     </div>
@@ -1035,28 +1504,27 @@ function renderStep8() {
     </div>
 
     <div class="field ${needsCaptions ? '' : 'hidden'}" id="row_closed_captions">
-      <label>Closed Captions <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      <label>Closed Captions <span class="badge badge-cond">conditional</span></label>
       ${makeToggle('closed_captions')}
-      <div class="helper">Required for video, animation and procedural demo content.</div>
+      <div class="helper">Recommended for video, animation and procedural demo content.</div>
     </div>
 
     <div class="field ${needsAlt ? '' : 'hidden'}" id="row_alt_text">
-      <label>Alt Text <span class="req">*</span> <span class="badge badge-cond">conditional</span></label>
+      <label>Alt Text <span class="badge badge-cond">conditional</span></label>
       <textarea name="alt_text" maxlength="500" oninput="saveInputs()">${state.data.alt_text||''}</textarea>
-      <div class="helper">Required for diagram and animation content. Max 500 characters.</div>
-      <div class="field-error" id="err_alt_text">Alt text is required for this content type.</div>
+      <div class="helper">Recommended for diagram and animation content. Max 500 characters.</div>
     </div>
 
     ${field('audio_narration', 'Audio Narration Available',
-      makeToggle('audio_narration'), 'Is an audio version available?', true)}
+      makeToggle('audio_narration'), 'Is an audio version available?')}
 
     ${field('screen_reader_compatible', 'Screen Reader Compatible',
       makeToggle('screen_reader_compatible'),
-      'Are all interactive elements labeled for screen readers?', true)}
+      'Are all interactive elements labeled for screen readers?')}
 
     ${field('mobile_optimized', 'Mobile Optimized',
       makeToggle('mobile_optimized'),
-      'Is this designed for a mobile viewport?', true)}
+      'Is this designed for a mobile viewport?')}
 
     ${field('transcript_file', 'Transcript File', `
       <div class="file-area" onclick="el('transcriptInput').click()">
@@ -1067,7 +1535,7 @@ function renderStep8() {
         <div class="file-chosen hidden" id="transcriptChosen"></div>
       </div>`, 'Optional. Processed separately by the ingest pipeline after submission.')}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-primary" onclick="nextStep()">Review →</button>
     </div>
@@ -1185,7 +1653,7 @@ function renderReview() {
       row('Mobile optimized', d.mobile_optimized ? 'Yes' : 'No'),
     ])}
 
-    <div class="nav">
+    <div class="wizard-footer">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-success" onclick="submitAsset()">Submit Asset ✓</button>
     </div>
@@ -1246,76 +1714,55 @@ function prevStep() {
 }
 
 // ─── Validation ───────────────────────────────────────────────────────────────
-function validateStep(idx) {
+function validateStep(idx, opts = {}) {
   const d = state.data
   let ok = true
+  const softLoWarn = opts.softLearningObjectiveWarn !== false
 
   function require(condition, msg) {
     if (!condition) { showAlert(msg); ok = false }
   }
 
   if (idx === 0) {
+    if (!state.editId) {
+      require(state.selectedFile, 'Please choose a file to upload.')
+    }
     require(d.title?.trim(), 'Title is required.')
     require(d.module_id, 'Module ID is required.')
     require(d.lesson_id?.trim(), 'Lesson ID is required.')
     require(d.content_type, 'Content type is required.')
-    require(d.author_source?.trim(), 'Author / source is required.')
-    require((d.language_versions || []).length > 0, 'At least one language version is required.')
   }
   if (idx === 1) {
     require((d.disease_relevance_tags || []).length > 0, 'At least one disease relevance tag is required.')
     require(d.concept_domain, 'Concept domain is required.')
     require(d.primary_concept?.trim(), 'Primary concept is required.')
-    require((d.secondary_concepts || []).length > 0, 'At least one secondary concept is required.')
   }
   if (idx === 2) {
-    require(d.explanation_role, 'Explanation role is required.')
-    require(d.sequence_position, 'Sequence position is required.')
-    require(d.learning_objective?.trim(), 'Learning objective is required.')
-    require(d.bloom_level, "Bloom's level is required.")
-    require(d.object_granularity, 'Object granularity is required.')
     if (d.can_stand_alone === false) {
       require((d.prerequisite_concept_ids || []).length > 0,
         'This asset cannot stand alone — please add at least one prerequisite asset.')
     }
-    // Soft warning for learning objective verb
-    const obj = (d.learning_objective || '').trim()
-    const startsWithVerb = obj && obj[0] === obj[0].toUpperCase()
-    if (obj && !startsWithVerb) {
-      showAlert("⚠️ Learning objectives should start with an action verb (e.g. 'Explain', 'Identify'). You can still continue.")
+    if (softLoWarn) {
+      const obj = (d.learning_objective || '').trim()
+      const startsWithVerb = obj && obj[0] === obj[0].toUpperCase()
+      if (obj && !startsWithVerb) {
+        showAlert("⚠️ Learning objectives should start with an action verb (e.g. 'Explain', 'Identify'). You can still continue.")
+      }
     }
   }
   if (idx === 3) {
     require((d.target_audience || []).length > 0, 'At least one target audience is required.')
     require(d.health_literacy_level, 'Health literacy level is required.')
     require(d.medical_terminology_level, 'Medical terminology level is required.')
-    require(d.modality_type, 'Modality type is required.')
   }
   if (idx === 4) {
     require((d.stress_state_compatibility || []).length > 0, 'At least one stress state is required.')
     require((d.parent_expertise_stage || []).length > 0, 'At least one parent expertise stage is required.')
     require((d.care_journey_stage || []).length > 0, 'At least one care journey stage is required.')
-    require(d.cognitive_load_rating, 'Cognitive load rating is required.')
-    require(d.element_interactivity, 'Element interactivity is required.')
-  }
-  if (idx === 5) {
-    require(d.emotional_tone, 'Emotional tone is required.')
-    require(d.emotional_sensitivity_level, 'Emotional sensitivity level is required.')
   }
   if (idx === 6) {
     require((d.parent_question_patterns || []).length >= 2, 'Please add at least 2 parent question patterns.')
-    require(d.intent_type, 'Intent type is required.')
-    require(d.response_type, 'Response type is required.')
     require((d.keyword_triggers || []).length >= 3, 'Please add at least 3 keyword triggers.')
-  }
-  if (idx === 7) {
-    const ct = d.content_type || ''
-    if (['video_segment','animation','procedural_demo'].includes(ct)) {
-      require(d.closed_captions != null, 'Closed captions field is required for this content type.')
-    }
-    if (['diagram','animation'].includes(ct)) {
-      require(d.alt_text?.trim(), 'Alt text is required for this content type.')
-    }
   }
 
   return ok
@@ -1341,10 +1788,14 @@ function handleTranscriptSelect(input) {
   chosen.classList.remove('hidden')
 }
 
-// ─── Submit ───────────────────────────────────────────────────────────────────
-async function submitAsset() {
+// ─── Submit (new asset — POST /upload) ───────────────────────────────────────
+async function submitNewAsset() {
   saveInputs()
   hideAlert()
+
+  for (let i = 0; i <= 7; i++) {
+    if (!validateStep(i, { softLearningObjectiveWarn: false })) return
+  }
 
   const d = state.data
   const load   = d.cognitive_load_rating
@@ -1357,7 +1808,6 @@ async function submitAsset() {
   if (state.selectedFile)   formData.append('file', state.selectedFile)
   if (state.transcriptFile) formData.append('transcript', state.transcriptFile)
 
-  // Append all state fields
   Object.entries(d).forEach(([key, val]) => {
     if (val == null) return
     if (Array.isArray(val)) {
@@ -1403,14 +1853,6 @@ state.data.decision_support_context = false
 state.data.isolation_acknowledgment = false
 state.data.audio_narration      = false
 state.data.closed_captions      = false
-
-// ─── Load existing assets for typeahead ──────────────────────
-async function loadAssets() {
-  try {
-    const res  = await fetch('/assets')
-    state.allAssets = await res.json()
-  } catch(e) { console.warn('Could not load assets for typeahead', e) }
-}
 
 // ─── Edit mode: load existing asset into state ────────────────
 async function loadEditAsset(id) {
@@ -1464,10 +1906,12 @@ async function loadEditAsset(id) {
   }
 }
 
-// ─── Override submitAsset to handle edit mode ─────────────────
-const _originalSubmit = submitAsset
+// ─── Submit: new asset vs edit (PATCH) ───────────────────────
 async function submitAsset() {
-  if (!state.editId) { await _originalSubmit(); return }
+  if (!state.editId) {
+    await submitNewAsset()
+    return
+  }
 
   saveInputs()
   hideAlert()
