@@ -6,14 +6,14 @@ export const assetToLearningModule = (asset: any): LearningModule => {
 
         title: asset.title,
 
-        description: asset.learning_objective || "No description available",
+        description: asset.primary_concept || "No description available",
 
         category: asset.concept_domain || "General",
 
         difficulty:
-            asset.content_type === "animation"
+            asset.parent_expertise_stage[0] === "novice" || asset.parent_expertise_stage[0] === "emerging"
                 ? "Beginner"
-                : asset.content_type === "video_segment"
+                : asset.parent_expertise_stage[0] === "developing" || asset.parent_expertise_stage[0] === "proficient"
                     ? "Intermediate"
                     : "Advanced",
 

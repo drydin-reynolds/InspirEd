@@ -335,12 +335,6 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
               {module.difficulty}
             </ThemedText>
           </View>
-          <View style={styles.durationContainer}>
-            <Icon name="time" size={14} color={theme.textSecondary} />
-            <ThemedText style={[styles.durationText, { color: theme.textSecondary }]}>
-              {module.duration}
-            </ThemedText>
-          </View>
         </View>
         {module.progress > 0 && !module.completed && (
           <View style={styles.progressContainer}>
