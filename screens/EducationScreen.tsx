@@ -14,12 +14,14 @@ import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-na
 import { askEducationalQuestion } from "@/utils/gemini";
 import { SearchBar } from "@/components/SearchBar";
 import { assetToLearningModule } from "@/utils/assetConvertion"
+import { openAssetPDF } from "../utils/openAsset";
+import { useEffect } from "react";
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function EducationScreen() {
   const { theme } = useTheme();
-  const { learningModules, educationChatMessages, addEducationChatMessage, readingLevel } =
+    const { learningModules, setLearningModules, educationChatMessages, addEducationChatMessage, readingLevel, toggleModuleComplete } =
     useAppContext();
   const navigation = useNavigation<any>();
 
@@ -28,12 +30,21 @@ export default function EducationScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [results, setResults] = useState<any[]>([]);
+  const [recommended, setRecommended] = useState<any[]>([]);
+    const [loadingRecommended, setLoadingRecommended] = useState(false);
+    const moduleMap = new Map(
+        learningModules.map((m) => [m.id, m])
+    );
 
   const completedCount = learningModules.filter((m) => m.completed).length;
   const totalCount = learningModules.length;
   const overallProgress = Math.round((completedCount / totalCount) * 100);
 
-  const categories = Array.from(new Set(learningModules.map((m) => m.category)));
+    const categories = Array.from(new Set(learningModules.map((m) => m.category)));
+
+    useEffect(() => {
+        fetchRecommended();
+    }, []);
 
   const handleAskQuestion = async () => {
     if (!inputText.trim() || isLoading) return;
@@ -85,6 +96,40 @@ export default function EducationScreen() {
 
         const data = await res.json();
         setResults(data);
+    };
+
+
+    const fetchRecommended = async () => {
+        try {
+            setLoadingRecommended(true);
+
+            const res = await fetch(
+                "http://10.205.227.129:3000/assets/recommended"
+            );
+
+            const data = await res.json();
+
+            const modules = data.map(assetToLearningModule);
+            
+            setLearningModules((prev) => {
+                const existing = new Map(prev.map((m) => [m.id, m]));
+
+                modules.forEach((m: LearningModule) => {
+                    if (!existing.has(m.id)) {
+                        existing.set(m.id, m);
+                    }
+                });
+
+                return Array.from(existing.values());
+            });
+            
+            setRecommended(data);
+
+        } catch (err) {
+            console.error("Error fetching recommended:", err);
+        } finally {
+            setLoadingRecommended(false);
+        }
     };
 
   if (showChat) {
@@ -182,17 +227,25 @@ export default function EducationScreen() {
             }}
         />
 
-        {results.map((item) => (
-            <ModuleCard
-                key={item._id}
-                module={assetToLearningModule(item)}
-                onPress={() => {
-                    navigation.navigate("ModuleDetail", {
-                        moduleId: item._id,
-                    });
-                }}
-            />
-        ))}
+        {results.map((item) => {
+            const base = assetToLearningModule(item);
+            const stored = moduleMap.get(base.id);
+
+            return (
+                <ModuleCard
+                    key={base.id}
+                    module={{
+                        ...base,
+                        completed: stored?.completed ?? false,
+                        progress: stored?.progress ?? 0,
+                    }}
+                    onPress={() =>
+                        openAssetPDF(item.title, "http://10.205.227.129:3000" + item.file_path)
+                    }
+                    onToggleComplete={toggleModuleComplete}
+                />
+            );
+        })}
         
         <View style={styles.actionButtons}>
           <Button
@@ -214,7 +267,45 @@ export default function EducationScreen() {
           </Pressable>
         </View>
 
-        
+        <View style={styles.categorySection}>
+            <ThemedText style={styles.categoryTitle}>
+                Recommended for You
+            </ThemedText>
+
+            {loadingRecommended ? (
+                <ThemedText style={{ color: theme.textSecondary }}>
+                    Loading...
+                </ThemedText>
+            ) : recommended.length === 0 ? (
+                <ThemedText style={{ color: theme.textSecondary }}>
+                    No recommendations yet
+                </ThemedText>
+            ) : (
+                recommended.map((item) => {
+                    const base = assetToLearningModule(item);
+                    const stored = moduleMap.get(base.id);
+
+                    return (
+                        <ModuleCard
+                            key={base.id}
+                            module={{
+                                ...base,
+                                completed: stored?.completed ?? false,
+                                progress: stored?.progress ?? 0,
+                            }}
+                            onPress={() =>
+                                openAssetPDF(
+                                    item.title,
+                                    "http://10.205.227.129:3000" + item.file_path
+                                )
+                            }
+                            onToggleComplete={toggleModuleComplete}
+                        />
+                    );
+                })
+            )}
+        </View>
+
       </View>
     </ScreenScrollView>
   );
@@ -277,7 +368,7 @@ function CitationSection({ citations }: { citations: Citation[] }) {
   );
 }
 
-function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () => void }) {
+function ModuleCard({ module, onPress, onToggleComplete }: { module: LearningModule; onPress: () => void; onToggleComplete: (id: string) => void; }) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -354,7 +445,34 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
             </ThemedText>
           </View>
         )}
-      </View>
+          </View>
+
+          <View style={styles.completeContainer}>
+              <Pressable
+                  onPress={() => onToggleComplete(module.id)}
+                  style={[
+                      styles.completeButton,
+                      {
+                          borderColor: module.completed ? theme.success : theme.border,
+                          backgroundColor: module.completed ? theme.success + "20" : "transparent",
+                      },
+                  ]}
+              >
+                  <Icon
+                      name={module.completed ? "checkmark-circle" : "circle"}
+                      size={18}
+                      color={module.completed ? theme.success : theme.textSecondary}
+                  />
+                  <ThemedText
+                      style={{
+                          color: module.completed ? theme.success : theme.textSecondary,
+                          fontWeight: "600",
+                      }}
+                  >
+                      {module.completed ? "Completed" : "Mark Complete"}
+                  </ThemedText>
+              </Pressable>
+          </View>
     </AnimatedPressable>
   );
 }
@@ -459,6 +577,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.md,
   },
+    completeContainer: {
+        marginTop: Spacing.sm,
+    },
+
+    completeButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: Spacing.sm,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        borderRadius: BorderRadius.sm,
+        borderWidth: 1,
+    },
   difficultyBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,

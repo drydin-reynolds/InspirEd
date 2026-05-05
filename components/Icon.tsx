@@ -44,7 +44,8 @@ type IconName =
   | "play-circle"
   | "expand"
   | "contract"
-  | "search";
+  | "search"
+  | "circle";
 
 type IconProps = {
   name: IconName;

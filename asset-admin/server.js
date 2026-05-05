@@ -135,8 +135,15 @@ app.get('/assets', async (req, res) => {
   }
 })
 
-
-
+// ── Get recommended assets ───────────────────────────────────-
+app.get('/assets/recommended', async (req, res) => {
+    try {
+        const assets = await Asset.find().sort({ created_at: -1 })
+        res.json(assets)
+    } catch (err) {
+        res.status(500).json({ error: err.message })
+    }
+})
 
 
 // ── Get single asset ──────────────────────────────────────────
