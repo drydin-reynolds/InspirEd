@@ -91,7 +91,7 @@ export default function EducationScreen() {
         }
         
         const res = await fetch(
-            `http://10.205.227.129:3000/assets/search/query?q=${encodeURIComponent(text)}`
+            process.env.EXPO_PUBLIC_API_URL +`/assets/search/query?q=${encodeURIComponent(text)}`
         );
 
         const data = await res.json();
@@ -104,7 +104,7 @@ export default function EducationScreen() {
             setLoadingRecommended(true);
 
             const res = await fetch(
-                "http://10.205.227.129:3000/assets/recommended"
+                process.env.EXPO_PUBLIC_API_URL+"/assets/recommended"
             );
 
             const data = await res.json();
