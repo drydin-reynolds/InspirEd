@@ -27,82 +27,161 @@ const getAI = (): GoogleGenAI => {
   return ai;
 };
 
-export interface TranscriptionResult {
+/** Full output after transcribing a visit recording (matches Visit detail UI sections). */
+export interface VisitAudioProcessingResult {
   transcription: string;
   summary: string;
+  keyPoints: string[];
+  diagnoses: string[];
+  actions: string[];
+  medicalTerms: { term: string; explanation: string }[];
+}
+
+/** @deprecated Use VisitAudioProcessingResult */
+export type TranscriptionResult = Pick<VisitAudioProcessingResult, "transcription" | "summary">;
+
+const EMPTY_STRUCTURED_VISIT: Omit<VisitAudioProcessingResult, "transcription"> = {
+  summary: "",
+  keyPoints: [],
+  diagnoses: [],
+  actions: [],
+  medicalTerms: [],
+};
+
+/** Turn a visit transcript into summary + key points + actions (+ terms) for the Visit detail UI. */
+export async function structureVisitFromTranscription(
+  transcription: string,
+  readingLevel: number = 8
+): Promise<Omit<VisitAudioProcessingResult, "transcription">> {
+  const readingGuidance = `Use clear, simple language appropriate for a ${readingLevel}th grade reading level where possible (especially in explanations).`;
+
+  const prompt = `You are helping a parent understand their child's medical visit (often pulmonary / respiratory care).
+
+Analyze the transcription below and return ONLY valid JSON — no markdown fences, no commentary.
+
+${readingGuidance}
+
+Return this exact shape:
+{
+  "summary": "string",
+  "keyPoints": ["string"],
+  "diagnoses": ["string"],
+  "actions": ["string"],
+  "medicalTerms": [{ "term": "string", "explanation": "string" }]
+}
+
+Rules:
+- summary: 2–4 short sentences of narrative prose only (what happened and what it means). Do NOT use bullet characters, numbered lists, or markdown in summary — paragraphs/sentences only. Do not repeat the keyPoints or actions lists verbatim; this is the gentle overview for the parent.
+- keyPoints: 3–6 concise takeaway facts (tests, numbers/trends if stated, clinician conclusions).
+- diagnoses: conditions or labels the clinician discussed (empty array if none).
+- actions: concrete next steps for the caregiver (appointments, meds, monitoring, questions for next visit).
+- medicalTerms: important jargon with plain-language explanations (empty array if none).
+
+If nothing fits a field, use an empty string for summary only if truly impossible; otherwise write a brief summary. Use [] for empty arrays.
+
+TRANSCRIPTION:
+${transcription}`;
+
+  try {
+    const response = await getAI().models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    const text = response.text || "{}";
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      return { ...EMPTY_STRUCTURED_VISIT, summary: "" };
+    }
+
+    const parsed = JSON.parse(jsonMatch[0]) as Record<string, unknown>;
+    return {
+      summary: typeof parsed.summary === "string" ? parsed.summary.trim() : "",
+      keyPoints: Array.isArray(parsed.keyPoints)
+        ? parsed.keyPoints.filter((x): x is string => typeof x === "string")
+        : [],
+      diagnoses: Array.isArray(parsed.diagnoses)
+        ? parsed.diagnoses.filter((x): x is string => typeof x === "string")
+        : [],
+      actions: Array.isArray(parsed.actions)
+        ? parsed.actions.filter((x): x is string => typeof x === "string")
+        : [],
+      medicalTerms: Array.isArray(parsed.medicalTerms)
+        ? parsed.medicalTerms
+            .filter(
+              (x): x is { term: string; explanation: string } =>
+                typeof x === "object" &&
+                x !== null &&
+                typeof (x as { term?: string }).term === "string" &&
+                typeof (x as { explanation?: string }).explanation === "string"
+            )
+            .map((x) => ({ term: x.term.trim(), explanation: x.explanation.trim() }))
+        : [],
+    };
+  } catch (error) {
+    console.error("structureVisitFromTranscription failed:", error);
+    return { ...EMPTY_STRUCTURED_VISIT, summary: "" };
+  }
+}
+
+/** Audio → plain transcript only (Gemini multimodal). */
+export async function transcribeVisitAudio(
+  audioUri: string,
+  mimeType: string = "audio/webm"
+): Promise<string> {
+  if (Platform.OS === "web") {
+    throw new Error(
+      "Audio transcription is not available on web. Please use the Expo Go app on your phone to record and transcribe visits."
+    );
+  }
+
+  const audioBase64 = await FileSystem.readAsStringAsync(audioUri, {
+    encoding: FileSystem.EncodingType.Base64,
+  });
+
+  const transcriptionContents = [
+    {
+      inlineData: {
+        data: audioBase64,
+        mimeType: mimeType,
+      },
+    },
+    `Transcribe this audio file from a medical visit. Provide a complete, accurate transcription of everything that was said. 
+Do not add any commentary or additional text - just the transcription.`,
+  ];
+
+  const transcriptionResponse = await getAI().models.generateContent({
+    model: "gemini-2.5-flash",
+    contents: transcriptionContents,
+  });
+
+  const transcription = transcriptionResponse.text || "";
+
+  if (!transcription) {
+    throw new Error("No transcription generated");
+  }
+
+  return transcription;
 }
 
 export async function transcribeAndSummarizeAudio(
   audioUri: string,
   mimeType: string = "audio/webm",
   readingLevel?: number
-): Promise<TranscriptionResult> {
+): Promise<VisitAudioProcessingResult> {
   try {
-    if (Platform.OS === "web") {
-      throw new Error(
-        "Audio transcription is not available on web. Please use the Expo Go app on your phone to record and transcribe visits."
-      );
-    }
-
-    const audioBase64 = await FileSystem.readAsStringAsync(audioUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
-
-    const transcriptionContents = [
-      {
-        inlineData: {
-          data: audioBase64,
-          mimeType: mimeType,
-        },
-      },
-      `Transcribe this audio file from a medical visit. Provide a complete, accurate transcription of everything that was said. 
-Do not add any commentary or additional text - just the transcription.`,
-    ];
-
-    const transcriptionResponse = await getAI().models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: transcriptionContents,
-    });
-
-    const transcription = transcriptionResponse.text || "";
-
-    if (!transcription) {
-      throw new Error("No transcription generated");
-    }
-
-    const readingLevelGuidance = readingLevel
-      ? `Adapt the summary to a ${readingLevel}th grade reading level using clear, simple language appropriate for that level.`
-      : "Use clear, accessible language appropriate for general audiences.";
-
-    const summaryContents = [
-      `This is a transcription from a medical visit for a child with a chronic pulmonary condition. Analyze this transcription and provide a concise, helpful summary that includes:
-
-- Main topics discussed during the visit
-- Key medical findings or observations
-- Diagnosis or condition updates (if mentioned)
-- Medications prescribed or changed (if any)
-- Action items for the parent/caregiver
-- Follow-up instructions or next steps
-- Important questions to ask at the next visit (if applicable)
-
-${readingLevelGuidance}
-
-Format the summary in a clear, readable way with proper paragraphs and bullet points where appropriate. Remember this is for a parent managing their child's care, so be empathetic and clear.
-
-TRANSCRIPTION:
-${transcription}`,
-    ];
-
-    const summaryResponse = await getAI().models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: summaryContents,
-    });
-
-    const summary = summaryResponse.text || "";
+    const transcription = await transcribeVisitAudio(audioUri, mimeType);
+    const level = readingLevel ?? 8;
+    const structured = await structureVisitFromTranscription(transcription, level);
 
     return {
       transcription,
-      summary,
+      summary: structured.summary,
+      keyPoints: structured.keyPoints,
+      diagnoses: structured.diagnoses,
+      actions: structured.actions,
+      medicalTerms: structured.medicalTerms,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -161,51 +240,13 @@ export async function extractVisitDetails(
   transcription: string,
   readingLevel: number = 8
 ): Promise<VisitExtraction> {
-  try {
-    const prompt = `Analyze this medical visit transcription and extract structured information. Return ONLY valid JSON with no additional text.
-
-TRANSCRIPTION:
-${transcription}
-
-Extract the following and return as JSON:
-{
-  "keyPoints": ["array of 3-5 key points from the visit"],
-  "diagnoses": ["array of any diagnoses or conditions mentioned"],
-  "actions": ["array of action items for the parent/caregiver"],
-  "medicalTerms": [{"term": "medical term", "explanation": "simple explanation at ${readingLevel}th grade level"}]
-}
-
-Guidelines:
-- keyPoints: Most important takeaways a parent should remember
-- diagnoses: Any medical conditions, diagnoses, or health status updates mentioned
-- actions: Things the parent needs to do (medications, follow-ups, monitoring, etc.)
-- medicalTerms: Any medical jargon with simple explanations appropriate for a ${readingLevel}th grade reading level
-
-If a category has no relevant information, return an empty array for that field.`;
-
-    const response = await getAI().models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-    });
-
-    const text = response.text || "{}";
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        keyPoints: parsed.keyPoints || [],
-        diagnoses: parsed.diagnoses || [],
-        actions: parsed.actions || [],
-        medicalTerms: parsed.medicalTerms || [],
-      };
-    }
-    
-    return { keyPoints: [], diagnoses: [], actions: [], medicalTerms: [] };
-  } catch (error) {
-    console.error("Failed to extract visit details:", error);
-    return { keyPoints: [], diagnoses: [], actions: [], medicalTerms: [] };
-  }
+  const full = await structureVisitFromTranscription(transcription, readingLevel);
+  return {
+    keyPoints: full.keyPoints,
+    diagnoses: full.diagnoses,
+    actions: full.actions,
+    medicalTerms: full.medicalTerms,
+  };
 }
 
 export async function suggestPlannerQuestions(

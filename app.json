@@ -41,6 +41,12 @@
           }
         }
       ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Allow InspirEd to record doctor visits so we can transcribe and summarize them for you."
+        }
+      ],
       "expo-web-browser"
     ],
     "experiments": {

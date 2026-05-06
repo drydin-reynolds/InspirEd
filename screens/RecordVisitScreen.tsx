@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { View, StyleSheet, Pressable, TextInput, Alert, ScrollView, ActivityIndicator, Platform } from "react-native";
+import { View, StyleSheet, Pressable, TextInput, Alert, ScrollView, ActivityIndicator, Platform, Linking } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { Icon } from "@/components/Icon";
@@ -15,9 +15,9 @@ import Animated, {
   withSequence,
   withTiming,
 } from "react-native-reanimated";
-import { extractVisitDetails } from "@/utils/gemini";
-import { transcribeAndSummarizeAudio } from "@/utils/gemini";
+import { transcribeVisitAudio, structureVisitFromTranscription } from "@/utils/gemini";
 import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system/legacy";
 
 /*
  * NOTE: Using expo-av for audio recording despite its deprecation in SDK 54.
@@ -54,7 +54,6 @@ export default function RecordVisitScreen() {
   const [seconds, setSeconds] = useState(0);
   const [doctorName, setDoctorName] = useState("");
   const [recording, setRecording] = useState<Audio.Recording | null>(null);
-  const [permissionGranted, setPermissionGranted] = useState(false);
   
   const [reviewMode, setReviewMode] = useState(false);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -80,8 +79,59 @@ export default function RecordVisitScreen() {
     soundRef.current = sound;
   }, [sound]);
 
+  /** Reads current mic permission and requests it if needed. */
+  const refreshRecordingPermission = async (): Promise<boolean> => {
+    try {
+      const current = await Audio.getPermissionsAsync();
+      if (current.granted) {
+        if (Platform.OS !== "web") {
+          await Audio.setAudioModeAsync({
+            allowsRecordingIOS: true,
+            playsInSilentModeIOS: true,
+          });
+        }
+        return true;
+      }
+
+      const requested = await Audio.requestPermissionsAsync();
+      const granted = requested.granted;
+
+      if (!granted) {
+        return false;
+      }
+
+      if (Platform.OS !== "web") {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+      }
+      return true;
+    } catch (error) {
+      console.error("Permission error:", error);
+      return false;
+    }
+  };
+
+  const alertMicDenied = () => {
+    const message =
+      Platform.OS === "web"
+        ? "Recording from this browser preview is unreliable. Scan the QR code in Expo and open InspirEd in Expo Go on your phone (preferred). If you stay on web, allow the microphone when the browser asks."
+        : "InspirEd needs microphone access to record doctor visits. You can enable the microphone in your device settings. Recording does not work in the iOS Simulator.";
+
+    if (Platform.OS === "web") {
+      Alert.alert("Microphone access needed", message, [{ text: "OK" }]);
+      return;
+    }
+
+    Alert.alert("Microphone access needed", message, [
+      { text: "Cancel", style: "cancel" },
+      { text: "Open Settings", onPress: () => void Linking.openSettings() },
+    ]);
+  };
+
   useEffect(() => {
-    requestPermissions();
+    void refreshRecordingPermission();
     return () => {
       if (recordingRef.current) {
         recordingRef.current.stopAndUnloadAsync().catch(console.error);
@@ -90,28 +140,8 @@ export default function RecordVisitScreen() {
         soundRef.current.unloadAsync().catch(console.error);
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- init-only mic probe
   }, []);
-
-  const requestPermissions = async () => {
-    try {
-      const { granted } = await Audio.requestPermissionsAsync();
-      setPermissionGranted(granted);
-      if (!granted) {
-        Alert.alert(
-          "Permission Required",
-          "InspirEd needs microphone access to record doctor visits. Please enable it in your device settings.",
-          [{ text: "OK" }]
-        );
-      } else {
-        await Audio.setAudioModeAsync({
-          allowsRecordingIOS: true,
-          playsInSilentModeIOS: true,
-        });
-      }
-    } catch (error) {
-      console.error("Permission error:", error);
-    }
-  };
 
   useEffect(() => {
     if (isRecording && !isPaused) {
@@ -146,6 +176,15 @@ export default function RecordVisitScreen() {
     return `${mins.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
   };
 
+  const cleanupRecordingFile = async (uri: string | null) => {
+    if (!uri) return;
+    try {
+      await FileSystem.deleteAsync(uri, { idempotent: true });
+    } catch (error) {
+      console.error("Failed to delete temporary recording:", error);
+    }
+  };
+
   const handleCancel = async () => {
     if (isRecording || seconds > 0) {
       const shouldCancel = Platform.OS === 'web' 
@@ -162,9 +201,11 @@ export default function RecordVisitScreen() {
             }
             setRecording(null);
           }
+          await cleanupRecordingFile(recordedUri);
           setIsRecording(false);
           setIsPaused(false);
           setSeconds(0);
+          setRecordedUri(null);
           navigation.goBack();
         }
       } else {
@@ -185,9 +226,11 @@ export default function RecordVisitScreen() {
                   }
                   setRecording(null);
                 }
+                await cleanupRecordingFile(recordedUri);
                 setIsRecording(false);
                 setIsPaused(false);
                 setSeconds(0);
+                setRecordedUri(null);
                 navigation.goBack();
               },
             },
@@ -204,18 +247,21 @@ export default function RecordVisitScreen() {
       setShowConsentOverlay(true);
       return;
     }
-    
-    if (!permissionGranted) {
-      await requestPermissions();
+
+    const granted = await refreshRecordingPermission();
+    if (!granted) {
+      alertMicDenied();
       return;
     }
-    
+
     try {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-      });
-      
+      if (Platform.OS !== "web") {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: true,
+          playsInSilentModeIOS: true,
+        });
+      }
+
       const { recording: newRecording } = await Audio.Recording.createAsync(
         Audio.RecordingOptionsPresets.HIGH_QUALITY
       );
@@ -224,7 +270,16 @@ export default function RecordVisitScreen() {
       setIsPaused(false);
     } catch (error) {
       console.error("Failed to start recording:", error);
-      Alert.alert("Recording Error", "Could not start recording. Please try again.");
+      const suffix =
+        Platform.OS === "web"
+          ? " Try Expo Go on a physical phone instead of the web preview."
+          : Platform.OS === "ios"
+            ? " On iOS, use a physical device (not the Simulator)."
+            : "";
+      Alert.alert(
+        "Recording Error",
+        `Could not start recording.${suffix} Please try again.`
+      );
     }
   };
 
@@ -345,6 +400,7 @@ export default function RecordVisitScreen() {
     });
     
     setReviewMode(false);
+    await cleanupRecordingFile(recordedUri);
     setRecordedUri(null);
     setPlaybackPosition(0);
     setPlaybackDuration(0);
@@ -371,7 +427,7 @@ export default function RecordVisitScreen() {
         date: new Date(),
         doctorName: doctorName || "Not specified",
         duration: seconds,
-        audioUri: recordedUri,
+        audioUri: "",
         transcription: null,
         summary: null,
         keyPoints: [],
@@ -380,50 +436,44 @@ export default function RecordVisitScreen() {
         medicalTerms: [],
         isProcessing: true,
       };
-      
       addVisit(visit);
       
       try {
-        const result = await transcribeAndSummarizeAudio(
-          recordedUri,
-          "audio/m4a",
-          readingLevel
-        );
-        
-        setTranscriptionResult(result.transcription);
+        const transcription = await transcribeVisitAudio(recordedUri, "audio/m4a");
+        setTranscriptionResult(transcription);
         setProcessingStatus("summarizing");
-        
-        const aiExtraction = await extractVisitDetails(
-          result.transcription,
-          readingLevel
-        );
-        
-        setSummaryResult(result.summary);
+
+        const structured = await structureVisitFromTranscription(transcription, readingLevel);
+        setSummaryResult(structured.summary);
         setProcessingStatus("complete");
-        
+
         updateVisit(visitId, {
-          transcription: result.transcription,
-          summary: result.summary,
-          keyPoints: aiExtraction.keyPoints,
-          diagnoses: aiExtraction.diagnoses,
-          actions: aiExtraction.actions,
-          medicalTerms: aiExtraction.medicalTerms,
+          transcription,
+          summary: structured.summary,
+          keyPoints: structured.keyPoints,
+          diagnoses: structured.diagnoses,
+          actions: structured.actions,
+          medicalTerms: structured.medicalTerms,
           isProcessing: false,
         });
+        await cleanupRecordingFile(recordedUri);
+        setRecordedUri(null);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
         console.error("Failed to process audio:", errorMessage);
         updateVisit(visitId, {
           isProcessing: false,
         });
+        await cleanupRecordingFile(recordedUri);
+        setRecordedUri(null);
         setProcessingMode(false);
         
         const isWebLimitation = Platform.OS === "web" || errorMessage.includes("not available on web");
         
         const title = isWebLimitation ? "Web Limitation" : "Processing Failed";
         const message = isWebLimitation 
-          ? "Audio transcription requires the Expo Go app on your phone. The visit has been saved without transcription. Please use the QR code to open InspirEd on your mobile device for full functionality."
-          : `Could not transcribe the recording: ${errorMessage}. The visit has been saved, but you may need to review the audio manually.`;
+          ? "Audio transcription requires the Expo Go app on your phone. The visit was saved without transcription. Please use the QR code to open InspirEd on your mobile device for full functionality."
+          : `Could not transcribe the recording: ${errorMessage}. The visit was saved without transcription.`;
         
         if (Platform.OS === "web") {
           window.alert(`${title}\n\n${message}`);
@@ -434,7 +484,7 @@ export default function RecordVisitScreen() {
       }
     } catch (error) {
       console.error("Failed to save visit:", error);
-      Alert.alert("Error", "Could not save the visit. Please try again.");
+      Alert.alert("Error", "Could not process the recording. Please try again.");
     }
   };
   
@@ -497,7 +547,7 @@ export default function RecordVisitScreen() {
               <View style={styles.consentItemText}>
                 <ThemedText style={styles.consentItemTitle}>Stored on Your Device</ThemedText>
                 <ThemedText style={styles.consentItemDescription}>
-                  Recordings stay on your phone. We don't have access to them.
+                  Recordings are temporary and deleted after processing.
                 </ThemedText>
               </View>
             </View>
@@ -517,7 +567,7 @@ export default function RecordVisitScreen() {
               <View style={styles.consentItemText}>
                 <ThemedText style={styles.consentItemTitle}>You're in Control</ThemedText>
                 <ThemedText style={styles.consentItemDescription}>
-                  Delete any recording anytime from your Profile settings.
+                  Visit notes are saved, but raw audio is not kept.
                 </ThemedText>
               </View>
             </View>
@@ -562,6 +612,16 @@ export default function RecordVisitScreen() {
         </ThemedText>
         <View style={styles.headerButton} />
       </View>
+
+      {!processingMode && Platform.OS === "web" ? (
+        <View style={styles.platformNotice} accessibilityRole="alert">
+          <Icon name="information-circle" size={22} color="rgba(255,255,255,0.95)" />
+          <ThemedText style={styles.platformNoticeText}>
+            Web preview: microphone recording is limited or unsupported here. For reliable recording, open InspirEd in{" "}
+            <ThemedText style={styles.platformNoticeEmphasis}>Expo Go</ThemedText> on your phone (same QR code / LAN URL).
+          </ThemedText>
+        </View>
+      ) : null}
 
       {processingMode ? (
         <ScrollView style={styles.processingContainer} contentContainerStyle={styles.processingContent}>
@@ -1098,6 +1158,26 @@ const styles = StyleSheet.create({
   consentSecondaryButtonText: {
     color: "rgba(255,255,255,0.7)",
     fontSize: 14,
+  },
+  platformNotice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: Spacing.sm,
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    padding: Spacing.md,
+    borderRadius: BorderRadius.md,
+    backgroundColor: "rgba(0,0,0,0.25)",
+  },
+  platformNoticeText: {
+    flex: 1,
+    color: "rgba(255,255,255,0.9)",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  platformNoticeEmphasis: {
+    fontWeight: "700",
+    color: "white",
   },
   questionsPanel: {
     position: "absolute",
