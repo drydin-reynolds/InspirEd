@@ -1,23 +1,28 @@
 # Mongo-backed RAG (setup guide)
 
-This describes the **optional** path where educational **chunks** live in **MongoDB** and retrieval runs on the **`asset-admin`** server. The chat-style answers still come from **Gemini** in the mobile app (`utils/gemini.ts`); only **which passages are retrieved** can come from the API instead of the bundled JSON.
+Educational **chunks** can live in **MongoDB** on two tiers:
 
-## What runs where
+1. **Recommended (prototype → prod path):** Mongoose model **`Chunk`** — created when you **generate embeddings** for an uploaded asset (upload wizard optional toggle, or **Browse → Generate embeddings**). Retrieval uses **`POST /api/rag/retrieve`** and chat orchestration uses **`POST /api/rag/chat`** on **`asset-admin`**.
+2. **Legacy / bulk import:** Collection synced from **`assets/medical-knowledge.json`** via **`npm run sync-rag`** (`RagChunk`). **`POST /api/rag/search`** still queries this collection for backwards compatibility.
+
+The Expo app:
+
+- If **`RAG_API_URL`** / **`EXPO_PUBLIC_RAG_API_URL`** is set → uses **`/api/rag/retrieve`** and **`/api/rag/chat`** (Gemini key is still required on the **device** in prototype mode, or on the **server** via `GEMINI_API_KEY`).
+- If not set → falls back to bundled **`medical-knowledge.json`** and client-side embedding (previous behavior).
 
 | Piece | Location |
 |--------|-----------|
-| Chunk storage (text + vectors) | MongoDB collection **`ragchunks`** (via Mongoose model `RagChunk`) |
-| “Find relevant chunks for this question” | `POST /api/rag/search` on **asset-admin** |
-| Load JSON → Mongo (one-off / after PDF rebuild) | `npm run sync-rag` in **asset-admin** |
-| Build `assets/medical-knowledge.json` from PDFs | `node scripts/process-pdfs.js` (repo **root**, needs `GEMINI_API_KEY` in env) |
-| Turn chunks + question into a **chat reply** | **Expo app** — `utils/rag.ts` → `utils/gemini.ts` |
-
-If **`EXPO_PUBLIC_RAG_API_URL`** is **not** set, the app keeps using **local** `medical-knowledge.json` only (previous behavior).
+| Chunk storage (ingested assets) | MongoDB collection **`chunks`** (Mongoose `Chunk`) |
+| Legacy JSON-backed chunks | **`ragchunks`** / `RagChunk` |
+| “Retrieve passages” | `POST /api/rag/retrieve` (**preferred**) or `POST /api/rag/search` (legacy) |
+| “Grounded chat reply” | `POST /api/rag/chat` on asset-admin |
+| Optional JSON → legacy Mongo | `npm run sync-rag` in **asset-admin** |
+| PDF → JSON (offline corpus) | `node scripts/process-pdfs.js` at repo root |
 
 ## Prerequisites
 
-- **MongoDB Atlas** (or other Mongo) — connection string ready
-- **Google Gemini API key** (AI Studio / project key with embedding + generate access)
+- **MongoDB Atlas** (or other Mongo) — connection string ready  
+- **Google Gemini API key** (embeddings + chat on server; mobile still uses Gemini for non-RAG features)  
 - Node 18+
 
 ## 1. Configure `asset-admin`
@@ -26,9 +31,11 @@ From `asset-admin/`:
 
 1. Copy `.env.example` → `.env` (do **not** commit `.env`).
 2. Set:
-   - **`MONGO_URI`** — Atlas connection string
-   - **`GEMINI_API_KEY`** — required for **`POST /api/rag/search`** (embeds the user’s question)
+   - **`MONGO_URI`** — Atlas connection string  
+   - **`GEMINI_API_KEY`** — required for ingestion (PDF extract, embeddings) and for **`/api/rag/*`** if you do not send a key from the client  
    - **`PORT`** — optional, default `3000`
+
+Atlas vector index (optional at small scale): see **[asset-admin/ATLAS_INDEX.md](../asset-admin/ATLAS_INDEX.md)**.
 
 ## 2. Install and start the server
 
@@ -38,73 +45,80 @@ npm install
 npm start
 ```
 
-You should see `Connected to MongoDB` and the listening URL.
+You should see `Connected to MongoDB`, a prototype warning about unauthenticated RAG routes, and the listening URL.
 
-## 3. Fill `RagChunk` from the knowledge JSON
+## 3. Create chunks (embeddings)
 
-After `assets/medical-knowledge.json` exists (from `process-pdfs` or repo checkout):
+**Option A — Upload wizard:** On **Review**, enable **Generate embeddings after submit** (optional).
 
-```bash
-cd asset-admin
-npm run sync-rag
-```
+**Option B — Browse:** Open **Browse**, pick an asset → **Generate embeddings**. Poll status via **`GET /assets/:id/embedding-status`** (the UI refreshes automatically).
 
-This **replaces** all documents in `RagChunk` with the contents of that file.
+Requires extractable text: **PDF / TXT / HTML**, or a **transcript** (`.txt`, `.vtt`, `.srt`) for video/audio.
 
 ## 4. Smoke-test the API
 
-- **Chunk count:** `GET http://localhost:3000/api/rag/stats`  
-  Expect `totalChunks` > 0 after sync.
+**Legacy stats (RagChunk):**  
+`GET http://localhost:3000/api/rag/stats`
 
-- **Search:**  
-  ```bash
-  curl -s -X POST http://localhost:3000/api/rag/search \
-    -H "Content-Type: application/json" \
-    -d '{"query":"pulmonary surfactant","topK":3,"minSimilarity":0.3}'
-  ```  
-  Response is **`{ "results": [ { "chunk": {...}, "similarity": ... }, ... ] }`** — structured passages, not a chat paragraph. The app builds the chat message separately.
+**Chunk retrieval (preferred):**
 
-## 5. Point the Expo app at the server (optional)
+```bash
+curl -s -X POST http://localhost:3000/api/rag/retrieve \
+  -H "Content-Type: application/json" \
+  -H "x-gemini-api-key: $GEMINI_API_KEY" \
+  -d '{"query":"pulmonary surfactant","topK":3}'
+```
 
-1. Phone/simulator and laptop on the **same Wi‑Fi**.
-2. Use your machine’s **LAN IP** (not `localhost` on the device).
+**Grounded chat:**
+
+```bash
+curl -s -X POST http://localhost:3000/api/rag/chat \
+  -H "Content-Type: application/json" \
+  -H "x-gemini-api-key: $GEMINI_API_KEY" \
+  -d '{"question":"What is surfactant?","readingLevel":8,"conversationHistory":[]}'
+```
+
+From the repo root you can also run **`node scripts/rag-smoke.mjs`** (set **`RAG_BASE`** and **`GEMINI_API_KEY`**).
+
+## 5. Point the Expo app at asset-admin
+
+1. Same Wi‑Fi as the phone/emulator; use the machine **LAN IP** (not `localhost` on device).
+
+In **`app.json`** → `expo.extra`:
+
+```json
+"RAG_API_URL": "http://YOUR_LAN_IP:3000",
+"PROTOTYPE_RAG_MODE": true
+```
+
+Or:
 
 ```bash
 export EXPO_PUBLIC_RAG_API_URL=http://YOUR_LAN_IP:3000
 npx expo start
 ```
 
-(`app.config.js` passes this through as `extra.RAG_API_URL`.)
+**Security note:** `PROTOTYPE_RAG_MODE` documents that API keys and config may stay client-side; replace with proper auth and server-side secrets before production.
 
-**iOS:** plain `http://` to a local IP may require App Transport Security exceptions in a dev build.
-
-## Rebuilding the knowledge JSON (PDFs)
-
-From the **repository root** (not `asset-admin`):
+## Rebuilding the bundled JSON corpus (optional)
 
 ```bash
 export GEMINI_API_KEY=your_key
 node scripts/process-pdfs.js
-```
-
-Then sync again:
-
-```bash
 cd asset-admin && npm run sync-rag
 ```
 
-See **`scripts/process-pdfs.js`** — PDF text uses **`gemini-2.5-flash`**; chunk embeddings use **`gemini-embedding-001`** (768 dimensions). Query embeddings use the same model so scores stay meaningful.
+Chunk ingest uses **`text-embedding-004`** (768 dims). Align embedding models if you change providers.
 
 ## Troubleshooting
 
 | Issue | Things to check |
 |--------|------------------|
-| `Cannot GET /api/rag/...` | Request **asset-admin** (e.g. port **3000**), not the Expo/Metro port. |
-| `results: []` | Run **`sync-rag`**; try lowering **`minSimilarity`** in the POST body; ensure query/chunk embeddings use the **same** model (re-run **`process-pdfs`** + **`sync-rag`** after model changes). |
-| Gemini **404** on embed | Old `text-embedding-004` URLs are deprecated; server and app should use **`gemini-embedding-001`** (see `asset-admin/lib/ragSearch.js` and `utils/rag.ts`). |
-| CORS errors in web Expo | **`cors`** is enabled on asset-admin for dev (`origin: true`). |
+| `results: []` / empty chat | Asset **`embedding_status`** must be **`ready`**; ensure PDF/transcript produced text; lower **`minSimilarity`** only when testing legacy search |
+| Cannot reach API from phone | Firewall; correct **LAN IP**; iOS ATS may block plain HTTP in release builds |
+| `GEMINI_API_KEY is not configured` on server | Set key in **`asset-admin/.env`** or pass **`x-gemini-api-key`** / **`geminiApiKey`** in JSON (prototype only) |
 
 ## Security
 
-- Never commit **`asset-admin/.env`** or real API keys.
-- Rotate keys if they are ever pushed to git.
+- Never commit **`asset-admin/.env`** or real API keys.  
+- **`POST /api/rag/*`** is rate-limited but **not** user-authenticated in this prototype — run behind a firewall or VPN when demoing with real keys.

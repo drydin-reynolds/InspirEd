@@ -5,11 +5,33 @@ const mongoose = require('mongoose')
 const multer   = require('multer')
 const path     = require('path')
 const Asset    = require('./models/Asset')
+const Chunk    = require('./models/Chunk')
+const { queueIngest } = require('./lib/ragIngest')
+const rateLimit = require('express-rate-limit')
+const { chatWithRag, retrieveOnly } = require('./lib/ragChat')
 const RagChunk = require('./models/RagChunk')
 const { searchRagChunks } = require('./lib/ragSearch')
 
 const app = express()
 app.use(express.json())
+
+const ragLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 40,
+  standardHeaders: true,
+  legacyHeaders: false
+})
+
+// CORS for mobile app → asset-admin RAG (prototype)
+app.use('/api', (req, res, next) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, x-gemini-api-key, x-rag-prototype')
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204)
+  }
+  next()
+})
 app.use(cors({ origin: true }))
 app.use(express.static('public'))
 app.use('/uploads', express.static('uploads'))
@@ -123,7 +145,18 @@ app.post('/upload', upload.fields([
     })
 
     await asset.save()
-    res.json({ success: true, asset_id: asset.asset_id, asset })
+
+    const genEmb = b.generate_embeddings === 'true' || b.generate_embeddings === true
+    if (genEmb) {
+      await Asset.findByIdAndUpdate(asset._id, {
+        embedding_status: 'queued',
+        embedding_updated_at: new Date()
+      })
+      queueIngest(asset._id.toString())
+    }
+
+    const fresh = await Asset.findById(asset._id)
+    res.json({ success: true, asset_id: fresh.asset_id, asset: fresh })
   } catch (err) {
     res.status(400).json({ success: false, error: err.message })
   }
@@ -157,7 +190,7 @@ app.get('/assets/:id', async (req, res) => {
   // ── Search + filter assets ────────────────────────────────────
   app.get('/assets/search/query', async (req, res) => {
     try {
-      const { q, content_type, disease_tag, concept_domain } = req.query
+      const { q, content_type, disease_tag, concept_domain, embedding_status } = req.query
       const filter = {}
       if (q) {
         filter.$or = [
@@ -168,6 +201,7 @@ app.get('/assets/:id', async (req, res) => {
       if (content_type)  filter.content_type          = content_type
       if (disease_tag)   filter.disease_relevance_tags = disease_tag
       if (concept_domain) filter.concept_domain        = concept_domain
+      if (embedding_status) filter.embedding_status    = embedding_status
   
       const assets = await Asset.find(filter)
         .sort({ created_at: -1 })
@@ -181,6 +215,7 @@ app.get('/assets/:id', async (req, res) => {
   // ── Delete asset ──────────────────────────────────────────────
   app.delete('/assets/:id', async (req, res) => {
     try {
+      await Chunk.deleteMany({ asset: req.params.id })
       await Asset.findByIdAndDelete(req.params.id)
       res.json({ success: true })
     } catch (err) {
@@ -245,9 +280,21 @@ app.get('/assets/:id', async (req, res) => {
       if (req.files?.file?.[0]) {
         updates.file_path         = `/uploads/${req.files.file[0].filename}`
         updates.original_filename = req.files.file[0].originalname
+        updates.rag_ready = false
+        updates.embedding_status = 'not_started'
+        updates.embedding_last_error = null
       }
       if (req.files?.transcript?.[0]) {
         updates.transcript_file_path = `/uploads/${req.files.transcript[0].filename}`
+        updates.rag_ready = false
+        updates.embedding_status = 'not_started'
+        updates.embedding_last_error = null
+      }
+
+      const genEmb = b.generate_embeddings === 'true' || b.generate_embeddings === true
+      if (genEmb) {
+        updates.embedding_status = 'queued'
+        updates.embedding_updated_at = new Date()
       }
   
       const asset = await Asset.findByIdAndUpdate(
@@ -256,9 +303,73 @@ app.get('/assets/:id', async (req, res) => {
         { new: true, runValidators: true }
       )
       if (!asset) return res.status(404).json({ error: 'Asset not found' })
+
+      if (genEmb) {
+        queueIngest(asset._id.toString())
+      }
+
       res.json({ success: true, asset })
     } catch (err) {
       res.status(400).json({ success: false, error: err.message })
+    }
+  })
+
+  // ── RAG: enqueue embedding generation for an asset ────────────
+  app.post('/assets/:id/generate-embeddings', async (req, res) => {
+    try {
+      const asset = await Asset.findById(req.params.id)
+      if (!asset) return res.status(404).json({ success: false, error: 'Asset not found' })
+
+      await Asset.findByIdAndUpdate(req.params.id, {
+        embedding_status: 'queued',
+        embedding_last_error: null,
+        embedding_updated_at: new Date()
+      })
+      queueIngest(req.params.id)
+      res.json({ success: true, message: 'queued' })
+    } catch (err) {
+      res.status(500).json({ success: false, error: err.message })
+    }
+  })
+
+  // ── RAG: embedding status (for admin UI polling) ─────────────
+  app.get('/assets/:id/embedding-status', async (req, res) => {
+    try {
+      const asset = await Asset.findById(req.params.id).select(
+        'rag_ready embedding_status embedding_last_error embedding_updated_at asset_id title'
+      )
+      if (!asset) return res.status(404).json({ error: 'Asset not found' })
+      res.json(asset)
+    } catch (err) {
+      res.status(500).json({ error: err.message })
+    }
+  })
+
+  // ── RAG: chat + retrieve (Expo app, prototype) ───────────────
+  app.post('/api/rag/chat', ragLimiter, async (req, res) => {
+    try {
+      const key = req.body?.geminiApiKey || req.headers['x-gemini-api-key']
+      const out = await chatWithRag({ ...req.body, geminiApiKey: key })
+      res.json(out)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      res.status(500).json({ error: msg, answer: '', citations: [] })
+    }
+  })
+
+  app.post('/api/rag/retrieve', ragLimiter, async (req, res) => {
+    try {
+      const key = req.body?.geminiApiKey || req.headers['x-gemini-api-key']
+      const { query, topK, clinicalReviewedOnly } = req.body || {}
+      const out = await retrieveOnly(query, {
+        geminiApiKey: key,
+        topK,
+        clinicalReviewedOnly: clinicalReviewedOnly === true
+      })
+      res.json(out)
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e)
+      res.status(500).json({ error: msg, context: '', citations: [], chunks: [] })
     }
   })
 
@@ -385,6 +496,9 @@ app.get('/api/rag/stats', async (req, res) => {
 mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log('Connected to MongoDB')
+    console.warn(
+      '[prototype] RAG routes (/api/rag/*) have no user authentication — use only on trusted networks.'
+    )
     app.listen(process.env.PORT || 3000, () =>
       console.log(`Server running at http://localhost:${process.env.PORT || 3000}`)
     )

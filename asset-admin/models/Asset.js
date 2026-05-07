@@ -168,6 +168,20 @@ const assetSchema = new mongoose.Schema({
   mobile_optimized:         { type: Boolean, required: true, default: true },
   transcript_file_path:     { type: String },
 
+  // ── RAG / embedding lifecycle (prototype) ───────────────────
+  rag_ready: {
+    type: Boolean,
+    default: false
+  },
+  embedding_status: {
+    type: String,
+    enum: ['not_started', 'queued', 'processing', 'ready', 'failed'],
+    default: 'not_started',
+    index: true
+  },
+  embedding_last_error: { type: String },
+  embedding_updated_at: { type: Date }
+
 }, {
   timestamps: { createdAt: 'created_at', updatedAt: 'updated_at' }
 })

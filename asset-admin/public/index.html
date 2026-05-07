@@ -1185,6 +1185,13 @@ function renderReview() {
       row('Mobile optimized', d.mobile_optimized ? 'Yes' : 'No'),
     ])}
 
+    <div class="rag-box" style="margin-bottom:24px;padding:20px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px">
+      <h3 style="font-size:15px;margin-bottom:12px;font-weight:600">RAG (optional)</h3>
+      ${field('generate_embeddings', 'Generate embeddings after submit',
+        makeToggle('generate_embeddings'),
+        'Uses the asset-admin server and GEMINI_API_KEY to chunk and embed text for the mobile AI Learning Assistant.', false)}
+    </div>
+
     <div class="nav">
       <button class="btn btn-secondary" onclick="prevStep()">← Back</button>
       <button class="btn btn-success" onclick="submitAsset()">Submit Asset ✓</button>
@@ -1403,6 +1410,7 @@ state.data.decision_support_context = false
 state.data.isolation_acknowledgment = false
 state.data.audio_narration      = false
 state.data.closed_captions      = false
+state.data.generate_embeddings  = false
 
 // ─── Load existing assets for typeahead ──────────────────────
 async function loadAssets() {
@@ -1552,6 +1560,7 @@ if (editId) {
   state.data.isolation_acknowledgment = false
   state.data.audio_narration          = false
   state.data.closed_captions          = false
+  state.data.generate_embeddings      = false
   loadAssets()
   renderStep(0)
 }

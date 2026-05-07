@@ -5,7 +5,6 @@
  * to ground AI responses in trusted sources.
  */
 
-import { GoogleGenAI } from "@google/genai";
 import Constants from "expo-constants";
 
 interface KnowledgeChunk {
@@ -42,19 +41,28 @@ export interface RAGContextWithCitations {
 }
 
 let knowledgeBase: KnowledgeBase | null = null;
-let ai: GoogleGenAI | null = null;
 
-function getRagApiBaseUrl(): string {
+export function getRagApiBaseUrl(): string {
   const raw =
     process.env.EXPO_PUBLIC_RAG_API_URL ||
     Constants.expoConfig?.extra?.RAG_API_URL ||
-    (Constants.manifest2?.extra?.expoClient?.extra as { RAG_API_URL?: string } | undefined)
-      ?.RAG_API_URL ||
+    Constants.expoConfig?.extra?.RAG_API_BASE_URL ||
+    (
+      Constants.manifest2?.extra?.expoClient?.extra as {
+        RAG_API_URL?: string;
+        RAG_API_BASE_URL?: string;
+      } | undefined
+    )?.RAG_API_URL ||
+    (
+      Constants.manifest2?.extra?.expoClient?.extra as {
+        RAG_API_BASE_URL?: string;
+      } | undefined
+    )?.RAG_API_BASE_URL ||
     "";
   return String(raw || "").replace(/\/$/, "");
 }
 
-/** When set, retrieval uses asset-admin POST /api/rag/search (Mongo RagChunk) first. */
+/** When set, retrieval uses asset-admin (Mongo) — see README. */
 export function usesRemoteRag(): boolean {
   return getRagApiBaseUrl().length > 0;
 }
@@ -71,12 +79,53 @@ const getApiKey = (): string => {
   return apiKey;
 };
 
-const getAI = (): GoogleGenAI => {
-  if (!ai) {
-    ai = new GoogleGenAI({ apiKey: getApiKey() });
+/** Chunk-based retrieval from asset-admin (Mongo `Chunk` collection). */
+async function fetchAssetAdminRetrieve(
+  query: string,
+  topK: number
+): Promise<{
+  context: string;
+  citations: Citation[];
+  chunks?: { id: string; text: string; similarity: number }[];
+} | null> {
+  const base = getRagApiBaseUrl();
+  if (!base) return null;
+  try {
+    const apiKey = getApiKey();
+    const res = await fetch(`${base}/api/rag/retrieve`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-gemini-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        query,
+        topK,
+        geminiApiKey: apiKey,
+        clinicalReviewedOnly: false,
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[RAG] /api/rag/retrieve failed: ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as {
+      context?: string;
+      citations?: Citation[];
+      chunks?: { id: string; text: string; similarity: number }[];
+      error?: string;
+    };
+    if (data.error) return null;
+    return {
+      context: data.context || "",
+      citations: data.citations || [],
+      chunks: data.chunks,
+    };
+  } catch (e) {
+    console.warn("[RAG] /api/rag/retrieve unreachable:", e);
+    return null;
   }
-  return ai;
-};
+}
 
 /**
  * Load the knowledge base from bundled assets
@@ -210,8 +259,8 @@ export async function retrieveRelevantContext(
   minSimilarity: number = 0.3
 ): Promise<RetrievalResult[]> {
   const fromApi = await retrieveFromMongoApi(query, topK, minSimilarity);
-  if (fromApi !== undefined) {
-    console.log(`[RAG] ${fromApi.length} chunk(s) from Mongo API`);
+  if (fromApi !== undefined && fromApi.length > 0) {
+    console.log(`[RAG] ${fromApi.length} chunk(s) from legacy RagChunk API`);
     return fromApi;
   }
 
@@ -259,6 +308,11 @@ function formatSourceName(source: string): string {
  * Get formatted context for AI prompts
  */
 export async function getRAGContext(query: string, topK: number = 3): Promise<string> {
+  const remote = await fetchAssetAdminRetrieve(query, topK);
+  if (remote?.context?.trim()) {
+    return remote.context;
+  }
+
   const results = await retrieveRelevantContext(query, topK);
   
   if (results.length === 0) {
@@ -280,6 +334,14 @@ export async function getRAGContextWithCitations(
   query: string, 
   topK: number = 3
 ): Promise<RAGContextWithCitations> {
+  const remote = await fetchAssetAdminRetrieve(query, topK);
+  if (remote?.context?.trim() || (remote?.citations && remote.citations.length > 0)) {
+    return {
+      context: remote.context || "",
+      citations: remote.citations || [],
+    };
+  }
+
   const results = await retrieveRelevantContext(query, topK);
   
   if (results.length === 0) {

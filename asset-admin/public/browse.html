@@ -121,6 +121,7 @@
     .badge-amber  { background: #fef3c7; color: #92400e; }
     .badge-pink   { background: #fce7f3; color: #9d174d; }
     .badge-gray   { background: #f3f4f6; color: #374151; }
+    .badge-red    { background: #fee2e2; color: #991b1b; }
 
     /* Cards view */
     .cards-grid {
@@ -250,6 +251,14 @@
       <option value="home_care">Home care</option>
       <option value="psychosocial">Psychosocial</option>
     </select>
+    <select id="filterEmbedding" onchange="fetchAssets()">
+      <option value="">All RAG statuses</option>
+      <option value="not_started">Not started</option>
+      <option value="queued">Queued</option>
+      <option value="processing">Processing</option>
+      <option value="ready">Ready</option>
+      <option value="failed">Failed</option>
+    </select>
     <a href="/" class="btn btn-primary">+ Upload</a>
   </div>
 
@@ -317,18 +326,33 @@ const domainBadge = {
   home_care:'badge-pink',    psychosocial:'badge-gray'
 }
 
+function ragBadge(status, ragReady) {
+  const map = {
+    not_started: { cls: 'badge-gray', label: 'not started' },
+    queued:      { cls: 'badge-amber', label: 'queued' },
+    processing:  { cls: 'badge-purple', label: 'processing' },
+    ready:       { cls: 'badge-green', label: ragReady ? 'RAG ready' : 'ready' },
+    failed:      { cls: 'badge-red', label: 'failed' },
+  }
+  const st = status || 'not_started'
+  const m = map[st] || map.not_started
+  return `<span class="badge ${m.cls}" title="embedding_status=${st}">RAG: ${m.label}</span>`
+}
+
 // ─── Fetch ────────────────────────────────────────────────────
 async function fetchAssets() {
   const q  = document.getElementById('searchInput').value.trim()
   const ct = document.getElementById('filterType').value
   const dt = document.getElementById('filterDisease').value
   const cd = document.getElementById('filterDomain').value
+  const emb = document.getElementById('filterEmbedding').value
 
   const params = new URLSearchParams()
   if (q)  params.set('q', q)
   if (ct) params.set('content_type', ct)
   if (dt) params.set('disease_tag', dt)
   if (cd) params.set('concept_domain', cd)
+  if (emb) params.set('embedding_status', emb)
 
   document.getElementById('content').innerHTML = '<div class="loading">Loading…</div>'
 
@@ -375,6 +399,7 @@ function renderTable() {
     { key: 'title',        label: 'Title' },
     { key: 'content_type', label: 'Type' },
     { key: 'concept_domain', label: 'Domain' },
+    { key: 'rag',          label: 'RAG' },
     { key: 'module_id',    label: 'Mod' },
     { key: 'created_at',   label: 'Created' },
   ]
@@ -391,6 +416,7 @@ function renderTable() {
       <td class="td-title"><span title="${a.title}">${a.title}</span></td>
       <td><span class="badge ${typeBadge[a.content_type]||'badge-gray'}">${(a.content_type||'').replace(/_/g,' ')}</span></td>
       <td><span class="badge ${domainBadge[a.concept_domain]||'badge-gray'}">${(a.concept_domain||'').replace(/_/g,' ')}</span></td>
+      <td>${ragBadge(a.embedding_status, a.rag_ready)}</td>
       <td>${a.module_id || '—'}</td>
       <td>${a.created_at ? new Date(a.created_at).toLocaleDateString() : '—'}</td>
     </tr>`).join('')
@@ -418,6 +444,7 @@ function renderCards() {
       </div>
       <div class="card-title">${a.title}</div>
       <div class="card-meta">
+        ${ragBadge(a.embedding_status, a.rag_ready)}
         ${a.concept_domain ? `<span class="badge ${domainBadge[a.concept_domain]||'badge-gray'}">${a.concept_domain.replace(/_/g,' ')}</span>` : ''}
         ${(a.disease_relevance_tags||[]).map(t => `<span class="badge badge-pink">${t}</span>`).join('')}
       </div>
@@ -544,12 +571,22 @@ async function openPanel(id) {
         row('Mobile optimized', asset.mobile_optimized ? 'Yes' : 'No'),
       ])}
 
+      ${section('RAG / embeddings', [
+        row('Status', (asset.embedding_status || 'not_started') + (asset.rag_ready ? ' (indexed)' : '')),
+        row('Last error', asset.embedding_last_error || '—'),
+        row('Updated', asset.embedding_updated_at ? new Date(asset.embedding_updated_at).toLocaleString() : '—'),
+      ])}
+
       <div style="font-size:12px;color:#9ca3af;margin-top:8px">
         Created: ${asset.created_at ? new Date(asset.created_at).toLocaleString() : '—'} &nbsp;|&nbsp;
         Updated: ${asset.updated_at ? new Date(asset.updated_at).toLocaleString() : '—'}
       </div>`
 
     document.getElementById('panelActions').innerHTML = `
+      <button class="btn btn-primary" style="flex:1" onclick="generateEmbeddings('${asset._id}')"
+        ${['processing','queued'].includes(asset.embedding_status) ? 'disabled' : ''}>
+        ${['ready'].includes(asset.embedding_status) ? '🔄 Re-generate embeddings' : '⚡ Generate embeddings'}
+      </button>
       <button class="btn btn-ghost" style="flex:1" onclick="editAsset('${asset._id}')">✏️ Edit</button>
       <button class="btn btn-danger" style="flex:1" onclick="confirmDelete('${asset._id}', '${asset.title.replace(/'/g,"\\'")}')">🗑 Delete</button>`
 
@@ -565,6 +602,41 @@ function closePanel() {
 
 function closePanelOnOverlay(e) {
   if (e.target === document.getElementById('panelOverlay')) closePanel()
+}
+
+// ─── RAG embedding generation ─────────────────────────────────
+async function generateEmbeddings(id) {
+  try {
+    const res = await fetch(`/assets/${id}/generate-embeddings`, { method: 'POST' })
+    const j = await res.json()
+    if (!j.success) {
+      alert(j.error || 'Could not queue embedding job')
+      return
+    }
+    fetchAssets()
+    const poll = setInterval(async () => {
+      try {
+        const s = await fetch(`/assets/${id}/embedding-status`)
+        const a = await s.json()
+        if (!a) return
+        if (a.embedding_status === 'ready') {
+          clearInterval(poll)
+          fetchAssets()
+          alert('RAG embeddings are ready for this asset.')
+        }
+        if (a.embedding_status === 'failed') {
+          clearInterval(poll)
+          fetchAssets()
+          alert('Embedding failed: ' + (a.embedding_last_error || 'unknown error'))
+        }
+      } catch (e) {
+        clearInterval(poll)
+      }
+    }, 1200)
+    setTimeout(() => clearInterval(poll), 120000)
+  } catch (e) {
+    alert('Network error: ' + e.message)
+  }
 }
 
 // ─── Edit ─────────────────────────────────────────────────────

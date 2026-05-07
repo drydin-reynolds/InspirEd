@@ -149,16 +149,15 @@ Scan the QR code with Expo Go to launch the app.
 
 ## Knowledge Base (RAG System)
 
-The app uses a local RAG (Retrieval-Augmented Generation) system to ground AI responses in trusted medical sources.  
-PDF documents are processed into embeddings and stored in `assets/medical-knowledge.json`.
+Grounded answers can use:
 
-To update the knowledge base:
+1. **MongoDB chunks (recommended)** — Upload assets in **`asset-admin`**, optionally generate embeddings on submit, or use **Browse → Generate embeddings**. Point the app at the server with **`RAG_API_URL`** or **`EXPO_PUBLIC_RAG_API_URL`** (see **[docs/rag-mongodb-setup.md](docs/rag-mongodb-setup.md)**).
 
-```
-node scripts/process-pdfs.js
-```
+2. **Bundled fallback** — Run `node scripts/process-pdfs.js` to refresh `assets/medical-knowledge.json`.
 
-**Optional — MongoDB + asset-admin:** Chunks can be synced to Atlas and retrieved via `POST /api/rag/search` on the `asset-admin` server. Set **`EXPO_PUBLIC_RAG_API_URL`** (e.g. `http://YOUR_LAN_IP:3000`) so the app uses that API for retrieval instead of only the bundled JSON. Full steps: **[docs/rag-mongodb-setup.md](docs/rag-mongodb-setup.md)**.
+Leave **`RAG_API_URL`** empty in `app.json` → `expo.extra` to use only the bundled JSON + on-device retrieval.
+
+**Prototype:** `PROTOTYPE_RAG_MODE` flags client-side keys; move secrets server-side before production.
 
 ---
 

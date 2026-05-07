@@ -2,7 +2,7 @@ import { GoogleGenAI } from "@google/genai";
 import * as FileSystem from "expo-file-system/legacy";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
-import { getRAGContext, getRAGContextWithCitations, loadKnowledgeBase, Citation } from "./rag";
+import { getRAGContext, getRAGContextWithCitations, loadKnowledgeBase, Citation, getRagApiBaseUrl } from "./rag";
 
 export type { Citation } from "./rag";
 
@@ -480,6 +480,40 @@ export async function askEducationalQuestion(
   readingLevel: number = 8
 ): Promise<EducationalResponse> {
   try {
+    const ragBase = getRagApiBaseUrl();
+    if (ragBase) {
+      const apiKey = getApiKey();
+      const res = await fetch(`${ragBase}/api/rag/chat`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-gemini-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          question,
+          readingLevel,
+          conversationHistory,
+          geminiApiKey: apiKey,
+          topK: 5,
+          clinicalReviewedOnly: false,
+        }),
+      });
+      const data = (await res.json()) as {
+        answer?: string;
+        citations?: Citation[];
+        error?: string;
+      };
+      if (!res.ok) {
+        console.warn("[RAG chat]", data.error || res.status);
+      } else if (data.answer) {
+        return {
+          answer: data.answer,
+          citations: data.citations ?? [],
+        };
+      }
+      // Fall through to local RAG + Gemini if chat endpoint fails or returns empty
+    }
+
     // Load knowledge base and get relevant context with citations
     await loadKnowledgeBase();
     const { context: ragContext, citations } = await getRAGContextWithCitations(question, 3);
