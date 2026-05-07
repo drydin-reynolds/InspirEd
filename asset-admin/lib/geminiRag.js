@@ -4,7 +4,8 @@
  */
 
 const EMBEDDING_MODEL = 'models/text-embedding-004'
-const PDF_MODEL = 'models/gemini-2.0-flash:generateContent'
+/** PDF text extraction; keep in sync with supported Gemini models (2.0-flash retired for new users). */
+const PDF_MODEL = 'models/gemini-2.5-flash:generateContent'
 
 async function callGeminiAPI(endpoint, body, apiKey) {
   const key = apiKey || process.env.GEMINI_API_KEY
