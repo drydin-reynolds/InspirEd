@@ -1,4 +1,5 @@
 const Chunk = require('../models/Chunk')
+const Asset = require('../models/Asset')
 const { embedText } = require('./geminiRag')
 
 function cosineSimilarity(a, b) {
@@ -67,10 +68,20 @@ async function retrieveChunks(query, options = {}) {
 
 /**
  * Format prompt context + citation list aligned with [1]..[n] markers.
+ * Loads Asset rows so citations can include PDF paths for in-app viewing.
  */
-function buildContextAndCitations(retrievalResults) {
+async function buildContextAndCitations(retrievalResults) {
   if (!retrievalResults.length) {
     return { context: '', citations: [] }
+  }
+
+  const uniqueAssetIds = [...new Set(retrievalResults.map((r) => r.chunk.asset).filter(Boolean))]
+  let assetById = new Map()
+  if (uniqueAssetIds.length > 0) {
+    const assets = await Asset.find({ _id: { $in: uniqueAssetIds } })
+      .select('_id file_path')
+      .lean()
+    assetById = new Map(assets.map((a) => [String(a._id), a]))
   }
 
   const contextParts = retrievalResults.map((r, index) => {
@@ -82,13 +93,25 @@ function buildContextAndCitations(retrievalResults) {
     '\n\n---\n\n'
   )}`
 
-  const citations = retrievalResults.map((r, index) => ({
-    id: `chunk-${r.chunk._id}`,
-    sourceTitle: formatSourceLabel(r.chunk),
-    excerpt:
-      String(r.chunk.text || '').slice(0, 200) + (String(r.chunk.text || '').length > 200 ? '...' : ''),
-    similarity: Math.round(r.similarity * 100)
-  }))
+  const citations = retrievalResults.map((r) => {
+    const aid = r.chunk.asset ? String(r.chunk.asset) : ''
+    const asset = aid ? assetById.get(aid) : null
+    const fp = asset?.file_path ? String(asset.file_path) : ''
+    const sourceFilePath = /\.pdf$/i.test(fp) ? fp : undefined
+    const assetMongoId = asset?._id != null ? String(asset._id) : undefined
+
+    const row = {
+      id: `chunk-${r.chunk._id}`,
+      sourceTitle: formatSourceLabel(r.chunk),
+      excerpt:
+        String(r.chunk.text || '').slice(0, 200) +
+        (String(r.chunk.text || '').length > 200 ? '...' : ''),
+      similarity: Math.round(r.similarity * 100)
+    }
+    if (sourceFilePath) row.sourceFilePath = sourceFilePath
+    if (assetMongoId) row.assetMongoId = assetMongoId
+    return row
+  })
 
   return { context, citations }
 }

@@ -43,7 +43,7 @@ async function chatWithRag(input) {
     }
   }
 
-  const { context, citations } = buildContextAndCitations(results)
+  const { context, citations } = await buildContextAndCitations(results)
 
   const historyContext =
     conversationHistory.length > 0
@@ -94,7 +94,7 @@ async function retrieveOnly(query, options = {}) {
     return { context: '', citations: [], chunks: [] }
   }
 
-  const { context, citations } = buildContextAndCitations(results)
+  const { context, citations } = await buildContextAndCitations(results)
   return {
     context,
     citations,

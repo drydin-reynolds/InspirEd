@@ -33,6 +33,9 @@ export interface Citation {
   sourceTitle: string;
   excerpt: string;
   similarity: number;
+  /** Server path e.g. `/uploads/foo.pdf` — join with RAG_API_URL for fetching */
+  sourceFilePath?: string;
+  assetMongoId?: string;
 }
 
 export interface RAGContextWithCitations {
@@ -60,6 +63,17 @@ export function getRagApiBaseUrl(): string {
     )?.RAG_API_BASE_URL ||
     "";
   return String(raw || "").replace(/\/$/, "");
+}
+
+/**
+ * Full URL to open a citation source PDF in-app (requires `RAG_API_URL` and `sourceFilePath` from asset-admin).
+ */
+export function buildCitationPdfUrl(sourceFilePath?: string): string | null {
+  if (!sourceFilePath || !/\.pdf$/i.test(sourceFilePath.trim())) return null;
+  const base = getRagApiBaseUrl();
+  if (!base) return null;
+  const p = sourceFilePath.startsWith("/") ? sourceFilePath : `/${sourceFilePath}`;
+  return `${base}${p}`;
 }
 
 /** When set, retrieval uses asset-admin (Mongo) — see README. */

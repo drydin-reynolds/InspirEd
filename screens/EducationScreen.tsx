@@ -1,24 +1,62 @@
-import React, { useState } from "react";
-import { View, StyleSheet, Pressable, TextInput } from "react-native";
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import {
+  View,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  Text,
+  ListRenderItemInfo,
+  Platform,
+  Keyboard,
+} from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
 import { Button } from "@/components/Button";
 import { Icon } from "@/components/Icon";
-import { MarkdownText } from "@/components/MarkdownText";
+import { MarkdownText, parseInlineFormatting } from "@/components/MarkdownText";
+import { PdfViewerModal } from "@/components/PdfViewerModal";
 import { useTheme } from "@/hooks/useTheme";
+import { useScreenInsets } from "@/hooks/useScreenInsets";
 import { Spacing, BorderRadius } from "@/constants/theme";
-import { useAppContext, LearningModule, Message, Citation } from "@/context/AppContext";
+import {
+  useAppContext,
+  LearningModule,
+  Message,
+  Citation,
+} from "@/context/AppContext";
 import { useNavigation } from "@react-navigation/native";
-import Animated, { useSharedValue, useAnimatedStyle, withSpring } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+} from "react-native-reanimated";
+import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { askEducationalQuestion } from "@/utils/gemini";
+import { buildCitationPdfUrl } from "@/utils/rag";
+
+/** Single-line body: compact like typical chat apps (line + minimal vertical padding). */
+const CHAT_INPUT_LINE_HEIGHT = 20;
+const CHAT_INPUT_MAX_LINES = 9;
+const CHAT_INPUT_PAD_V = Spacing.xs * 2;
+const CHAT_INPUT_MIN_HEIGHT = CHAT_INPUT_LINE_HEIGHT + CHAT_INPUT_PAD_V;
+const CHAT_INPUT_MAX_HEIGHT =
+  CHAT_INPUT_LINE_HEIGHT * CHAT_INPUT_MAX_LINES + CHAT_INPUT_PAD_V;
+
+/** Scroll clearance below messages — must live on contentContainerStyle, not FlatList style. */
+const CHAT_LIST_GAP_ABOVE_COMPOSER = Spacing.sm;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function EducationScreen() {
   const { theme } = useTheme();
-  const { learningModules, educationChatMessages, addEducationChatMessage, readingLevel } =
-    useAppContext();
+  const {
+    learningModules,
+    educationChatMessages,
+    addEducationChatMessage,
+    readingLevel,
+  } = useAppContext();
   const navigation = useNavigation<any>();
 
   const [showChat, setShowChat] = useState(false);
@@ -29,79 +67,212 @@ export default function EducationScreen() {
   const totalCount = learningModules.length;
   const overallProgress = Math.round((completedCount / totalCount) * 100);
 
-  const categories = Array.from(new Set(learningModules.map((m) => m.category)));
+  const categories = Array.from(
+    new Set(learningModules.map((m) => m.category)),
+  );
+
+  const flatListRef = useRef<Animated.FlatList<Message>>(null);
+  const [pdfModal, setPdfModal] = useState<{
+    uri: string;
+    title: string;
+  } | null>(null);
+  const [activeCitation, setActiveCitation] = useState<{
+    messageId: string;
+    index: number;
+  } | null>(null);
+  const [citationExpandedByMessageId, setCitationExpandedByMessageId] =
+    useState<Record<string, boolean>>({});
+  const { paddingTop, paddingBottom: tabBarBottomInset } = useScreenInsets();
+  const safeInsets = useSafeAreaInsets();
+  const { height: keyboardHeight } = useReanimatedKeyboardAnimation();
+
+  /** Tab-bar inset is huge vs home-indicator-only; applying it while the keyboard is up stacks empty space under the field and looks like a second keyboard. */
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
+
+  useEffect(() => {
+    const showEvent =
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow";
+    const hideEvent =
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide";
+    const subShow = Keyboard.addListener(showEvent, () =>
+      setKeyboardVisible(true),
+    );
+    const subHide = Keyboard.addListener(hideEvent, () =>
+      setKeyboardVisible(false),
+    );
+    return () => {
+      subShow.remove();
+      subHide.remove();
+    };
+  }, []);
+
+  const composerDockBottomInset = keyboardVisible
+    ? Math.max(safeInsets.bottom, Spacing.xs)
+    : tabBarBottomInset;
+
+  const [chatComposerDockHeight, setChatComposerDockHeight] = useState(72);
+  const [composerInputHeight, setComposerInputHeight] = useState(
+    CHAT_INPUT_MIN_HEIGHT,
+  );
+
+  const animatedChatInputStyle = useAnimatedStyle(
+    () => ({
+      transform: [{ translateY: keyboardHeight.value }],
+    }),
+    [],
+  );
+
+  useEffect(() => {
+    if (!activeCitation) return;
+    const t = setTimeout(() => setActiveCitation(null), 4500);
+    return () => clearTimeout(t);
+  }, [activeCitation]);
+
+  const handleCitationChip = useCallback(
+    (messageId: string, citationOneBased: number, citationCount: number) => {
+      const idx = citationOneBased - 1;
+      if (idx < 0 || idx >= citationCount) return;
+      setActiveCitation({ messageId, index: idx });
+      setCitationExpandedByMessageId((prev) => ({
+        ...prev,
+        [messageId]: true,
+      }));
+      const flatIndex = educationChatMessages.findIndex(
+        (m) => m.id === messageId,
+      );
+      if (flatIndex >= 0) {
+        requestAnimationFrame(() => {
+          flatListRef.current?.scrollToIndex({
+            index: flatIndex,
+            viewPosition: 0.35,
+            animated: true,
+          });
+        });
+      }
+    },
+    [educationChatMessages],
+  );
 
   const handleAskQuestion = async () => {
     if (!inputText.trim() || isLoading) return;
 
+    const questionText = inputText.trim();
     const userMessage: Message = {
       id: Date.now().toString(),
-      text: inputText.trim(),
+      text: questionText,
       isUser: true,
       timestamp: new Date(),
     };
 
     addEducationChatMessage(userMessage);
-    const questionText = inputText.trim();
     setInputText("");
+    setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
     setIsLoading(true);
 
-    const conversationHistory = educationChatMessages.map(msg => ({
-      text: msg.text,
-      isUser: msg.isUser,
-    }));
+    const conversationHistory = [
+      ...educationChatMessages.map((msg) => ({
+        text: msg.text,
+        isUser: msg.isUser,
+      })),
+      { text: questionText, isUser: true },
+    ];
 
-    const response = await askEducationalQuestion(
-      questionText,
-      conversationHistory,
-      readingLevel
-    );
+    try {
+      const response = await askEducationalQuestion(
+        questionText,
+        conversationHistory,
+        readingLevel,
+      );
 
-    const aiMessage: Message = {
-      id: (Date.now() + 1).toString(),
-      text: response.answer,
-      isUser: false,
-      timestamp: new Date(),
-      citations: response.citations,
-    };
+      const aiMessage: Message = {
+        id: (Date.now() + 1).toString(),
+        text: response.answer,
+        isUser: false,
+        timestamp: new Date(),
+        citations: response.citations,
+      };
 
-    addEducationChatMessage(aiMessage);
-    setIsLoading(false);
+      addEducationChatMessage(aiMessage);
+    } catch (e) {
+      console.warn("[EducationScreen] askEducationalQuestion failed", e);
+      addEducationChatMessage({
+        id: (Date.now() + 1).toString(),
+        text: "Something went wrong getting a response. Check your connection and API keys, then try again.",
+        isUser: false,
+        timestamp: new Date(),
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (showChat) {
     return (
-      <ScreenScrollView>
-        <View style={styles.container}>
-          <Pressable onPress={() => setShowChat(false)} style={styles.backButton}>
+      <View
+        style={[
+          styles.chatRoot,
+          {
+            paddingTop,
+            backgroundColor: theme.backgroundRoot,
+          },
+        ]}
+      >
+        <View style={[styles.container, styles.chatMainColumn]}>
+          <Pressable
+            onPress={() => setShowChat(false)}
+            style={styles.backButton}
+          >
             <Icon name="chevron-back" size={24} color={theme.primary} />
-            <ThemedText style={{ color: theme.primary, fontSize: 16, fontWeight: "600" }}>
+            <ThemedText
+              style={{ color: theme.primary, fontSize: 16, fontWeight: "600" }}
+            >
               Back to Learning
             </ThemedText>
           </Pressable>
 
-          <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
+          <ThemedView
+            style={[
+              styles.card,
+              { backgroundColor: theme.backgroundSecondary },
+            ]}
+          >
             <View style={styles.cardHeader}>
               <Icon name="chat" size={24} color={theme.accent} />
-              <ThemedText style={styles.cardTitle}>AI Learning Assistant</ThemedText>
+              <ThemedText style={styles.cardTitle}>
+                AI Learning Assistant
+              </ThemedText>
             </View>
-            <ThemedText style={[styles.helperText, { color: theme.textSecondary }]}>
-              Ask questions about pulmonary health, treatments, or any medical term you'd like
-              explained.
+            <ThemedText
+              style={[styles.helperText, { color: theme.textSecondary }]}
+            >
+              Ask questions about pulmonary health, treatments, or any medical
+              term you{"'"}d like explained.
             </ThemedText>
           </ThemedView>
 
-          <View style={styles.chatMessages}>
-            {educationChatMessages.map((msg) => (
+          <Animated.FlatList
+            ref={flatListRef}
+            style={styles.chatFlatList}
+            data={educationChatMessages}
+            keyExtractor={(item) => item.id}
+            extraData={{
+              activeCitation,
+              citationExpandedByMessageId,
+              messageCount: educationChatMessages.length,
+              isLoading,
+              chatComposerDockHeight,
+            }}
+            renderItem={({ item: msg }: ListRenderItemInfo<Message>) => (
               <View
-                key={msg.id}
                 style={[styles.messageBubble, msg.isUser && styles.userMessage]}
               >
                 <View
                   style={[
                     styles.messageContent,
                     {
-                      backgroundColor: msg.isUser ? theme.primary : theme.backgroundSecondary,
+                      backgroundColor: msg.isUser
+                        ? theme.primary
+                        : theme.backgroundSecondary,
                     },
                   ]}
                 >
@@ -109,42 +280,149 @@ export default function EducationScreen() {
                     <ThemedText style={{ color: "white" }}>
                       {msg.text}
                     </ThemedText>
+                  ) : msg.citations && msg.citations.length > 0 ? (
+                    <AssistantMessageWithCitations
+                      text={msg.text}
+                      citations={msg.citations}
+                      theme={theme}
+                      onCitationChip={(n) =>
+                        handleCitationChip(msg.id, n, msg.citations!.length)
+                      }
+                    />
                   ) : (
-                    <MarkdownText color={theme.text}>
-                      {msg.text}
-                    </MarkdownText>
+                    <MarkdownText color={theme.text}>{msg.text}</MarkdownText>
                   )}
                 </View>
                 {!msg.isUser && msg.citations && msg.citations.length > 0 ? (
-                  <CitationSection citations={msg.citations} />
+                  <CitationSection
+                    citations={msg.citations}
+                    expanded={citationExpandedByMessageId[msg.id] ?? false}
+                    onExpandedChange={(next) =>
+                      setCitationExpandedByMessageId((prev) => ({
+                        ...prev,
+                        [msg.id]: next,
+                      }))
+                    }
+                    highlightIndex={
+                      activeCitation?.messageId === msg.id
+                        ? activeCitation.index
+                        : null
+                    }
+                    onOpenPdf={(citation) => {
+                      const url = buildCitationPdfUrl(citation.sourceFilePath);
+                      if (url) {
+                        setPdfModal({ uri: url, title: citation.sourceTitle });
+                      }
+                    }}
+                  />
                 ) : null}
               </View>
-            ))}
-            {isLoading && (
-              <View style={styles.messageBubble}>
-                <View style={[styles.messageContent, { backgroundColor: theme.backgroundSecondary }]}>
-                  <ThemedText style={{ color: theme.textSecondary }}>Thinking...</ThemedText>
-                </View>
-              </View>
             )}
-          </View>
+            ListFooterComponent={
+              isLoading ? (
+                <View style={styles.messageBubble}>
+                  <View
+                    style={[
+                      styles.messageContent,
+                      { backgroundColor: theme.backgroundSecondary },
+                    ]}
+                  >
+                    <ThemedText style={{ color: theme.textSecondary }}>
+                      Thinking...
+                    </ThemedText>
+                  </View>
+                </View>
+              ) : null
+            }
+            contentContainerStyle={[
+              styles.chatListContent,
+              {
+                paddingBottom:
+                  chatComposerDockHeight + CHAT_LIST_GAP_ABOVE_COMPOSER,
+              },
+            ]}
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={
+              Platform.OS === "ios" ? "interactive" : "on-drag"
+            }
+            onScrollToIndexFailed={({ index }) => {
+              setTimeout(() => {
+                flatListRef.current?.scrollToOffset({
+                  offset: Math.max(0, index * 120),
+                  animated: true,
+                });
+              }, 150);
+            }}
+          />
 
-          <ThemedView style={[styles.inputCard, { backgroundColor: theme.backgroundSecondary }]}>
-            <TextInput
-              style={[styles.input, { color: theme.text }]}
-              value={inputText}
-              onChangeText={setInputText}
-              placeholder="Ask a question..."
-              placeholderTextColor={theme.textSecondary}
-              multiline
-              maxLength={500}
-            />
-            <Button onPress={handleAskQuestion} disabled={!inputText.trim() || isLoading}>
-              <Icon name="send" size={20} color="white" />
-            </Button>
-          </ThemedView>
+          <Animated.View
+            onLayout={(e) =>
+              setChatComposerDockHeight(e.nativeEvent.layout.height)
+            }
+            style={[
+              styles.chatInputDock,
+              {
+                borderTopColor: theme.border,
+                backgroundColor: theme.backgroundRoot,
+                paddingBottom: composerDockBottomInset,
+                paddingHorizontal: Spacing.lg,
+              },
+              animatedChatInputStyle,
+            ]}
+          >
+            <ThemedView
+              style={[
+                styles.inputCard,
+                styles.inputCardCompact,
+                { backgroundColor: theme.backgroundSecondary },
+              ]}
+            >
+              <TextInput
+                style={[
+                  styles.input,
+                  {
+                    color: theme.text,
+                    height: composerInputHeight,
+                    maxHeight: CHAT_INPUT_MAX_HEIGHT,
+                  },
+                ]}
+                value={inputText}
+                onChangeText={setInputText}
+                placeholder="Ask a question..."
+                placeholderTextColor={theme.textSecondary}
+                multiline
+                maxLength={500}
+                textAlignVertical="top"
+                scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT - 2}
+                onContentSizeChange={(e) => {
+                  const h = e.nativeEvent.contentSize.height;
+                  if (!Number.isFinite(h)) return;
+                  if (h > CHAT_INPUT_MAX_HEIGHT + 24) return;
+                  const clamped = Math.min(
+                    Math.max(h, CHAT_INPUT_MIN_HEIGHT),
+                    CHAT_INPUT_MAX_HEIGHT,
+                  );
+                  setComposerInputHeight(Math.ceil(clamped));
+                }}
+              />
+              <Button
+                onPress={handleAskQuestion}
+                disabled={!inputText.trim() || isLoading}
+                style={styles.chatSendButton}
+              >
+                <Icon name="send" size={20} color="white" />
+              </Button>
+            </ThemedView>
+          </Animated.View>
         </View>
-      </ScreenScrollView>
+
+        <PdfViewerModal
+          visible={pdfModal !== null}
+          uri={pdfModal?.uri ?? null}
+          title={pdfModal?.title}
+          onClose={() => setPdfModal(null)}
+        />
+      </View>
     );
   }
 
@@ -159,12 +437,23 @@ export default function EducationScreen() {
             },
           ]}
         >
-          <ThemedText style={styles.progressTitle}>Your Learning Progress</ThemedText>
+          <ThemedText style={styles.progressTitle}>
+            Your Learning Progress
+          </ThemedText>
           <View style={styles.progressStats}>
-            <ThemedText style={styles.progressNumber}>{completedCount}</ThemedText>
-            <ThemedText style={styles.progressLabel}>/ {totalCount} modules completed</ThemedText>
+            <ThemedText style={styles.progressNumber}>
+              {completedCount}
+            </ThemedText>
+            <ThemedText style={styles.progressLabel}>
+              / {totalCount} modules completed
+            </ThemedText>
           </View>
-          <View style={[styles.progressBar, { backgroundColor: "rgba(255,255,255,0.3)" }]}>
+          <View
+            style={[
+              styles.progressBar,
+              { backgroundColor: "rgba(255,255,255,0.3)" },
+            ]}
+          >
             <View
               style={[
                 styles.progressFill,
@@ -178,10 +467,7 @@ export default function EducationScreen() {
         </ThemedView>
 
         <View style={styles.actionButtons}>
-          <Button
-            onPress={() => setShowChat(true)}
-            style={{ flex: 1 }}
-          >
+          <Button onPress={() => setShowChat(true)} style={{ flex: 1 }}>
             <Icon name="chat" size={20} color="white" />
             Ask AI
           </Button>
@@ -198,7 +484,9 @@ export default function EducationScreen() {
         </View>
 
         {categories.map((category) => {
-          const categoryModules = learningModules.filter((m) => m.category === category);
+          const categoryModules = learningModules.filter(
+            (m) => m.category === category,
+          );
           return (
             <View key={category} style={styles.categorySection}>
               <ThemedText style={styles.categoryTitle}>{category}</ThemedText>
@@ -206,7 +494,9 @@ export default function EducationScreen() {
                 <ModuleCard
                   key={module.id}
                   module={module}
-                  onPress={() => navigation.navigate("ModuleDetail", { moduleId: module.id })}
+                  onPress={() =>
+                    navigation.navigate("ModuleDetail", { moduleId: module.id })
+                  }
                 />
               ))}
             </View>
@@ -217,64 +507,250 @@ export default function EducationScreen() {
   );
 }
 
-function CitationSection({ citations }: { citations: Citation[] }) {
+function paragraphNeedsBlockMarkdown(p: string): boolean {
+  return /^\s*[-*]\s/m.test(p) || /^\s*\d+[.)]\s/m.test(p);
+}
+
+function ParagraphInlineCitations({
+  para,
+  theme,
+  citationCount,
+  onCitationChip,
+}: {
+  para: string;
+  theme: { text: string; primary: string; textSecondary: string };
+  citationCount: number;
+  onCitationChip: (n: number) => void;
+}) {
+  const parts = para.split(/(\[\d+\])/g).filter((x) => x.length > 0);
+  return (
+    <Text
+      style={{
+        fontSize: 15,
+        lineHeight: 22,
+        color: theme.text,
+        marginBottom: Spacing.sm,
+      }}
+    >
+      {parts.map((p, i) => {
+        const m = p.match(/^\[(\d+)\]$/);
+        if (m) {
+          const n = parseInt(m[1], 10);
+          const valid = n >= 1 && n <= citationCount;
+          return (
+            <Text
+              key={i}
+              onPress={valid ? () => onCitationChip(n) : undefined}
+              style={{
+                color: valid ? theme.primary : theme.textSecondary,
+                fontWeight: "700",
+                ...(valid ? { textDecorationLine: "underline" as const } : {}),
+              }}
+            >
+              [{n}]
+            </Text>
+          );
+        }
+        const segs = parseInlineFormatting(p);
+        return (
+          <Text key={i}>
+            {segs.map((seg, j) => (
+              <Text
+                key={j}
+                style={[
+                  { fontSize: 15, lineHeight: 22, color: theme.text },
+                  seg.bold && { fontWeight: "700" as const },
+                  seg.italic && { fontStyle: "italic" as const },
+                ]}
+              >
+                {seg.text}
+              </Text>
+            ))}
+          </Text>
+        );
+      })}
+    </Text>
+  );
+}
+
+function AssistantMessageWithCitations({
+  text,
+  citations,
+  theme,
+  onCitationChip,
+}: {
+  text: string;
+  citations: Citation[];
+  theme: { text: string; primary: string; textSecondary: string };
+  onCitationChip: (n: number) => void;
+}) {
+  const paragraphs = text.split(/\n\n/).filter((p) => p.length > 0);
+  return (
+    <View>
+      {paragraphs.map((para, i) => {
+        if (paragraphNeedsBlockMarkdown(para)) {
+          return (
+            <View
+              key={i}
+              style={
+                i < paragraphs.length - 1
+                  ? { marginBottom: Spacing.sm }
+                  : undefined
+              }
+            >
+              <MarkdownText color={theme.text}>{para}</MarkdownText>
+            </View>
+          );
+        }
+        if (!/\[\d+\]/.test(para)) {
+          return (
+            <View
+              key={i}
+              style={
+                i < paragraphs.length - 1
+                  ? { marginBottom: Spacing.sm }
+                  : undefined
+              }
+            >
+              <MarkdownText color={theme.text}>{para}</MarkdownText>
+            </View>
+          );
+        }
+        return (
+          <ParagraphInlineCitations
+            key={i}
+            para={para}
+            theme={theme}
+            citationCount={citations.length}
+            onCitationChip={onCitationChip}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function CitationSection({
+  citations,
+  expanded,
+  onExpandedChange,
+  highlightIndex,
+  onOpenPdf,
+}: {
+  citations: Citation[];
+  expanded: boolean;
+  onExpandedChange: (next: boolean) => void;
+  highlightIndex: number | null;
+  onOpenPdf: (citation: Citation) => void;
+}) {
   const { theme } = useTheme();
-  const [expanded, setExpanded] = useState(false);
 
   if (citations.length === 0) return null;
 
   return (
     <View style={styles.citationContainer}>
-      <Pressable 
-        onPress={() => setExpanded(!expanded)} 
-        style={[styles.citationHeader, { backgroundColor: theme.primary + '15' }]}
+      <Pressable
+        onPress={() => onExpandedChange(!expanded)}
+        style={[
+          styles.citationHeader,
+          { backgroundColor: theme.primary + "15" },
+        ]}
       >
         <Icon name="document-text" size={14} color={theme.primary} />
-        <ThemedText style={[styles.citationHeaderText, { color: theme.primary }]}>
-          {citations.length} source{citations.length > 1 ? 's' : ''} referenced
+        <ThemedText
+          style={[styles.citationHeaderText, { color: theme.primary }]}
+        >
+          {citations.length} source{citations.length > 1 ? "s" : ""} referenced
         </ThemedText>
-        <Icon 
-          name={expanded ? "chevron-up" : "chevron-down"} 
-          size={14} 
-          color={theme.primary} 
+        <Icon
+          name={expanded ? "chevron-up" : "chevron-down"}
+          size={14}
+          color={theme.primary}
         />
       </Pressable>
-      
+
       {expanded ? (
-        <View style={[styles.citationList, { borderColor: theme.primary + '30' }]}>
-          {citations.map((citation, index) => (
-            <View 
-              key={citation.id} 
-              style={[
-                styles.citationItem, 
-                index < citations.length - 1 && { borderBottomColor: theme.border, borderBottomWidth: 1 }
-              ]}
-            >
-              <View style={styles.citationBadge}>
-                <ThemedText style={[styles.citationNumber, { color: theme.primary }]}>
-                  [{index + 1}]
-                </ThemedText>
-              </View>
-              <View style={styles.citationContent}>
-                <ThemedText style={[styles.citationTitle, { color: theme.text }]}>
-                  {citation.sourceTitle}
-                </ThemedText>
-                <ThemedText style={[styles.citationExcerpt, { color: theme.textSecondary }]}>
-                  {citation.excerpt}
-                </ThemedText>
-                <ThemedText style={[styles.citationRelevance, { color: theme.primary }]}>
-                  {citation.similarity}% relevance match
-                </ThemedText>
-              </View>
-            </View>
-          ))}
+        <View
+          style={[styles.citationList, { borderColor: theme.primary + "30" }]}
+        >
+          {citations.map((citation, index) => {
+            const pdfUrl = buildCitationPdfUrl(citation.sourceFilePath);
+            const isHighlighted = highlightIndex === index;
+            return (
+              <Pressable
+                key={citation.id}
+                onPress={() => {
+                  if (pdfUrl) {
+                    onOpenPdf(citation);
+                  }
+                }}
+                disabled={!pdfUrl}
+                style={[
+                  styles.citationItem,
+                  index < citations.length - 1 && {
+                    borderBottomColor: theme.border,
+                    borderBottomWidth: 1,
+                  },
+                  isHighlighted && { backgroundColor: theme.primary + "20" },
+                ]}
+              >
+                <View style={styles.citationBadge}>
+                  <ThemedText
+                    style={[styles.citationNumber, { color: theme.primary }]}
+                  >
+                    [{index + 1}]
+                  </ThemedText>
+                </View>
+                <View style={styles.citationContent}>
+                  <ThemedText
+                    style={[styles.citationTitle, { color: theme.text }]}
+                  >
+                    {citation.sourceTitle}
+                  </ThemedText>
+                  <ThemedText
+                    style={[
+                      styles.citationExcerpt,
+                      { color: theme.textSecondary },
+                    ]}
+                  >
+                    {citation.excerpt}
+                  </ThemedText>
+                  <ThemedText
+                    style={[styles.citationRelevance, { color: theme.primary }]}
+                  >
+                    {citation.similarity}% relevance match
+                  </ThemedText>
+                  {pdfUrl ? (
+                    <View style={styles.openPdfHint}>
+                      <Icon name="document" size={14} color={theme.primary} />
+                      <ThemedText
+                        style={{
+                          color: theme.primary,
+                          fontSize: 11,
+                          fontWeight: "600",
+                        }}
+                      >
+                        Tap to open PDF
+                      </ThemedText>
+                    </View>
+                  ) : null}
+                </View>
+              </Pressable>
+            );
+          })}
         </View>
       ) : null}
     </View>
   );
 }
 
-function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () => void }) {
+function ModuleCard({
+  module,
+  onPress,
+}: {
+  module: LearningModule;
+  onPress: () => void;
+}) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -309,12 +785,16 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
       <View style={styles.moduleHeader}>
         <View style={styles.moduleHeaderLeft}>
           <ThemedText style={styles.moduleTitle}>{module.title}</ThemedText>
-          <ThemedText style={[styles.moduleDescription, { color: theme.textSecondary }]}>
+          <ThemedText
+            style={[styles.moduleDescription, { color: theme.textSecondary }]}
+          >
             {module.description}
           </ThemedText>
         </View>
         {module.completed && (
-          <View style={[styles.completedBadge, { backgroundColor: theme.success }]}>
+          <View
+            style={[styles.completedBadge, { backgroundColor: theme.success }]}
+          >
             <Icon name="check" size={16} color="white" />
           </View>
         )}
@@ -322,7 +802,12 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
 
       <View style={styles.moduleFooter}>
         <View style={styles.moduleMetadata}>
-          <View style={[styles.difficultyBadge, { backgroundColor: getDifficultyColor(module.difficulty) + "20" }]}>
+          <View
+            style={[
+              styles.difficultyBadge,
+              { backgroundColor: getDifficultyColor(module.difficulty) + "20" },
+            ]}
+          >
             <ThemedText
               style={[
                 styles.difficultyText,
@@ -334,14 +819,21 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
           </View>
           <View style={styles.durationContainer}>
             <Icon name="time" size={14} color={theme.textSecondary} />
-            <ThemedText style={[styles.durationText, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.durationText, { color: theme.textSecondary }]}
+            >
               {module.duration}
             </ThemedText>
           </View>
         </View>
         {module.progress > 0 && !module.completed && (
           <View style={styles.progressContainer}>
-            <View style={[styles.miniProgressBar, { backgroundColor: theme.backgroundDefault }]}>
+            <View
+              style={[
+                styles.miniProgressBar,
+                { backgroundColor: theme.backgroundDefault },
+              ]}
+            >
               <View
                 style={[
                   styles.miniProgressFill,
@@ -352,7 +844,9 @@ function ModuleCard({ module, onPress }: { module: LearningModule; onPress: () =
                 ]}
               />
             </View>
-            <ThemedText style={[styles.progressText, { color: theme.textSecondary }]}>
+            <ThemedText
+              style={[styles.progressText, { color: theme.textSecondary }]}
+            >
               {module.progress}%
             </ThemedText>
           </View>
@@ -526,6 +1020,27 @@ const styles = StyleSheet.create({
   chatMessages: {
     gap: Spacing.md,
   },
+  chatRoot: {
+    flex: 1,
+  },
+  /** Lets FlatList flex fill space between header card and input (otherwise list height is 0). */
+  chatMainColumn: {
+    flex: 1,
+  },
+  chatFlatList: {
+    flex: 1,
+  },
+  chatInputDock: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  chatListContent: {
+    gap: Spacing.md,
+    flexGrow: 1,
+  },
   messageBubble: {
     maxWidth: "80%",
   },
@@ -537,17 +1052,29 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
   },
   inputCard: {
-    padding: Spacing.md,
     borderRadius: BorderRadius.md,
     flexDirection: "row",
-    gap: Spacing.md,
     alignItems: "flex-end",
+  },
+  /** Shorter composer bar so less of the thread is obscured. */
+  inputCardCompact: {
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.md,
+    gap: Spacing.sm,
+  },
+  chatSendButton: {
+    width: 44,
+    height: 44,
+    minHeight: 44,
+    paddingHorizontal: 0,
+    borderRadius: 22,
   },
   input: {
     flex: 1,
     fontSize: 15,
-    minHeight: 40,
-    maxHeight: 100,
+    lineHeight: CHAT_INPUT_LINE_HEIGHT,
+    paddingVertical: Spacing.xs,
+    paddingHorizontal: Spacing.sm,
   },
   citationContainer: {
     marginTop: Spacing.sm,
@@ -598,5 +1125,11 @@ const styles = StyleSheet.create({
   citationRelevance: {
     fontSize: 10,
     fontWeight: "500",
+  },
+  openPdfHint: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: Spacing.xs,
   },
 });
