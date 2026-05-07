@@ -3,7 +3,9 @@
  * Requires GEMINI_API_KEY in environment for PDF extraction and embeddings.
  */
 
-const EMBEDDING_MODEL = 'models/text-embedding-004'
+const EMBEDDING_MODEL = 'models/gemini-embedding-001'
+/** Keep aligned with query embeddings and atlas-vector-index.example.json (768). */
+const EMBEDDING_DIM = 768
 /** PDF text extraction; keep in sync with supported Gemini models (2.0-flash retired for new users). */
 const PDF_MODEL = 'models/gemini-2.5-flash:generateContent'
 
@@ -28,6 +30,17 @@ async function callGeminiAPI(endpoint, body, apiKey) {
   return response.json()
 }
 
+function parseEmbedValues(data) {
+  if (!data || typeof data !== 'object') return []
+  const e = data.embedding
+  if (Array.isArray(e?.values) && e.values.length) return e.values
+  if (Array.isArray(e?.value) && e.value.length) return e.value
+  if (Array.isArray(e) && typeof e[0] === 'number') return e
+  const first = Array.isArray(data.embeddings) ? data.embeddings[0] : null
+  if (Array.isArray(first?.values) && first.values.length) return first.values
+  return []
+}
+
 /**
  * @param {string} text
  * @param {string} [apiKey]
@@ -41,12 +54,14 @@ async function embedText(text, apiKey) {
     `${EMBEDDING_MODEL}:embedContent`,
     {
       model: EMBEDDING_MODEL,
-      content: { parts: [{ text: trimmed }] }
+      content: { parts: [{ text: trimmed }] },
+      outputDimensionality: EMBEDDING_DIM,
+      taskType: 'RETRIEVAL_DOCUMENT',
     },
     apiKey
   )
 
-  return response.embedding?.values || []
+  return parseEmbedValues(response)
 }
 
 /**
@@ -106,5 +121,6 @@ module.exports = {
   embedText,
   extractTextFromPdfBuffer,
   generateText,
-  EMBEDDING_MODEL
+  EMBEDDING_MODEL,
+  EMBEDDING_DIM,
 }

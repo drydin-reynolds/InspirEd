@@ -12,7 +12,7 @@ const chunkSchema = new mongoose.Schema(
     sourceAssetId: { type: String, required: true, index: true },
     chunkIndex: { type: Number, required: true, min: 0 },
     text: { type: String, required: true },
-    /** text-embedding-004 vector (768 dims) */
+    /** gemini-embedding-001 vector (768 dims with outputDimensionality, see geminiRag.js) */
     embedding: { type: [Number], default: [] },
     sourceTitle: { type: String, required: true },
     contentType: { type: String },

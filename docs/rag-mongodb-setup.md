@@ -108,7 +108,7 @@ node scripts/process-pdfs.js
 cd asset-admin && npm run sync-rag
 ```
 
-Chunk ingest uses **`text-embedding-004`** (768 dims). Align embedding models if you change providers.
+Chunk ingest uses **`gemini-embedding-001`** (768 dims via `outputDimensionality`). Align embedding models if you change providers.
 
 ## Troubleshooting
 
