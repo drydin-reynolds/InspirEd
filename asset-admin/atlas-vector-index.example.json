@@ -1,0 +1,24 @@
+{
+  "name": "rag_chunk_embedding",
+  "type": "vectorSearch",
+  "fields": [
+    {
+      "type": "vector",
+      "path": "embedding",
+      "numDimensions": 768,
+      "similarity": "cosine"
+    },
+    {
+      "type": "filter",
+      "path": "clinicallyReviewed"
+    },
+    {
+      "type": "filter",
+      "path": "diseaseTags"
+    },
+    {
+      "type": "filter",
+      "path": "asset"
+    }
+  ]
+}

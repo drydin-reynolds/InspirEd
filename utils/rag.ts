@@ -5,7 +5,6 @@
  * to ground AI responses in trusted sources.
  */
 
-import { GoogleGenAI } from "@google/genai";
 import Constants from "expo-constants";
 
 interface KnowledgeChunk {
@@ -34,6 +33,9 @@ export interface Citation {
   sourceTitle: string;
   excerpt: string;
   similarity: number;
+  /** Server path e.g. `/uploads/foo.pdf` — join with RAG_API_URL for fetching */
+  sourceFilePath?: string;
+  assetMongoId?: string;
 }
 
 export interface RAGContextWithCitations {
@@ -42,7 +44,42 @@ export interface RAGContextWithCitations {
 }
 
 let knowledgeBase: KnowledgeBase | null = null;
-let ai: GoogleGenAI | null = null;
+
+export function getRagApiBaseUrl(): string {
+  const raw =
+    process.env.EXPO_PUBLIC_RAG_API_URL ||
+    Constants.expoConfig?.extra?.RAG_API_URL ||
+    Constants.expoConfig?.extra?.RAG_API_BASE_URL ||
+    (
+      Constants.manifest2?.extra?.expoClient?.extra as {
+        RAG_API_URL?: string;
+        RAG_API_BASE_URL?: string;
+      } | undefined
+    )?.RAG_API_URL ||
+    (
+      Constants.manifest2?.extra?.expoClient?.extra as {
+        RAG_API_BASE_URL?: string;
+      } | undefined
+    )?.RAG_API_BASE_URL ||
+    "";
+  return String(raw || "").replace(/\/$/, "");
+}
+
+/**
+ * Full URL to open a citation source PDF in-app (requires `RAG_API_URL` and `sourceFilePath` from asset-admin).
+ */
+export function buildCitationPdfUrl(sourceFilePath?: string): string | null {
+  if (!sourceFilePath || !/\.pdf$/i.test(sourceFilePath.trim())) return null;
+  const base = getRagApiBaseUrl();
+  if (!base) return null;
+  const p = sourceFilePath.startsWith("/") ? sourceFilePath : `/${sourceFilePath}`;
+  return `${base}${p}`;
+}
+
+/** When set, retrieval uses asset-admin (Mongo) — see README. */
+export function usesRemoteRag(): boolean {
+  return getRagApiBaseUrl().length > 0;
+}
 
 const getApiKey = (): string => {
   const apiKey = 
@@ -56,26 +93,72 @@ const getApiKey = (): string => {
   return apiKey;
 };
 
-const getAI = (): GoogleGenAI => {
-  if (!ai) {
-    ai = new GoogleGenAI({ apiKey: getApiKey() });
+/** Chunk-based retrieval from asset-admin (Mongo `Chunk` collection). */
+async function fetchAssetAdminRetrieve(
+  query: string,
+  topK: number
+): Promise<{
+  context: string;
+  citations: Citation[];
+  chunks?: { id: string; text: string; similarity: number }[];
+} | null> {
+  const base = getRagApiBaseUrl();
+  if (!base) return null;
+  try {
+    const apiKey = getApiKey();
+    const res = await fetch(`${base}/api/rag/retrieve`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-gemini-api-key": apiKey,
+      },
+      body: JSON.stringify({
+        query,
+        topK,
+        geminiApiKey: apiKey,
+        clinicalReviewedOnly: false,
+      }),
+    });
+    if (!res.ok) {
+      console.warn(`[RAG] /api/rag/retrieve failed: ${res.status}`);
+      return null;
+    }
+    const data = (await res.json()) as {
+      context?: string;
+      citations?: Citation[];
+      chunks?: { id: string; text: string; similarity: number }[];
+      error?: string;
+    };
+    if (data.error) return null;
+    return {
+      context: data.context || "",
+      citations: data.citations || [],
+      chunks: data.chunks,
+    };
+  } catch (e) {
+    console.warn("[RAG] /api/rag/retrieve unreachable:", e);
+    return null;
   }
-  return ai;
-};
+}
 
 /**
  * Load the knowledge base from bundled assets
  */
 export async function loadKnowledgeBase(): Promise<boolean> {
   if (knowledgeBase) return true;
-  
+
   try {
-    // Dynamic import for the bundled knowledge base
-    const data = require('@/assets/medical-knowledge.json');
-    knowledgeBase = data as KnowledgeBase;
-    console.log(`[RAG] Loaded ${knowledgeBase.totalChunks} chunks from ${knowledgeBase.sources.length} sources`);
+    const data = require('@/assets/medical-knowledge.json') as KnowledgeBase;
+    knowledgeBase = data;
+    console.log(
+      `[RAG] Loaded ${knowledgeBase.totalChunks} chunks locally from medical-knowledge.json`
+    );
     return true;
   } catch (error) {
+    if (usesRemoteRag()) {
+      console.log("[RAG] No local JSON; retrieval will use RAG_API_URL (Mongo) when configured");
+      return true;
+    }
     console.warn('[RAG] Knowledge base not available:', error);
     return false;
   }
@@ -107,15 +190,17 @@ function cosineSimilarity(a: number[], b: number[]): number {
 async function generateQueryEmbedding(query: string): Promise<number[]> {
   try {
     const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${getApiKey()}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent?key=${getApiKey()}`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: 'models/text-embedding-004',
+          model: 'models/gemini-embedding-001',
           content: {
             parts: [{ text: query }],
           },
+          outputDimensionality: 768,
+          taskType: 'RETRIEVAL_QUERY',
         }),
       }
     );
@@ -125,10 +210,57 @@ async function generateQueryEmbedding(query: string): Promise<number[]> {
     }
     
     const data = await response.json();
-    return data.embedding?.values || [];
+    return (
+      data.embedding?.values ||
+      data.embedding?.value ||
+      (Array.isArray(data.embeddings) && data.embeddings[0]?.values) ||
+      []
+    );
   } catch (error) {
     console.error('[RAG] Error generating query embedding:', error);
     return [];
+  }
+}
+
+type ApiChunkHit = {
+  chunk: { id: string; text: string; source: string; chunkIndex: number };
+  similarity: number;
+};
+
+/** Mongo-backed search via asset-admin. Undefined = error (fall back to local JSON). */
+async function retrieveFromMongoApi(
+  query: string,
+  topK: number,
+  minSimilarity: number
+): Promise<RetrievalResult[] | undefined> {
+  const base = getRagApiBaseUrl();
+  if (!base) return undefined;
+
+  try {
+    const res = await fetch(`${base}/api/rag/search`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, topK, minSimilarity }),
+    });
+    if (!res.ok) {
+      console.warn(`[RAG] API /api/rag/search failed: ${res.status}`);
+      return undefined;
+    }
+    const data = (await res.json()) as { results?: ApiChunkHit[] };
+    const hits = data.results ?? [];
+    return hits.map((h) => ({
+      chunk: {
+        id: h.chunk.id,
+        text: h.chunk.text,
+        source: h.chunk.source,
+        chunkIndex: h.chunk.chunkIndex,
+        embedding: [],
+      },
+      similarity: h.similarity,
+    }));
+  } catch (e) {
+    console.warn("[RAG] Mongo API unreachable, falling back to local JSON if present:", e);
+    return undefined;
   }
 }
 
@@ -140,7 +272,12 @@ export async function retrieveRelevantContext(
   topK: number = 3,
   minSimilarity: number = 0.3
 ): Promise<RetrievalResult[]> {
-  // Ensure knowledge base is loaded
+  const fromApi = await retrieveFromMongoApi(query, topK, minSimilarity);
+  if (fromApi !== undefined && fromApi.length > 0) {
+    console.log(`[RAG] ${fromApi.length} chunk(s) from legacy RagChunk API`);
+    return fromApi;
+  }
+
   const loaded = await loadKnowledgeBase();
   if (!loaded || !knowledgeBase) {
     console.warn('[RAG] Knowledge base not available');
@@ -185,6 +322,11 @@ function formatSourceName(source: string): string {
  * Get formatted context for AI prompts
  */
 export async function getRAGContext(query: string, topK: number = 3): Promise<string> {
+  const remote = await fetchAssetAdminRetrieve(query, topK);
+  if (remote?.context?.trim()) {
+    return remote.context;
+  }
+
   const results = await retrieveRelevantContext(query, topK);
   
   if (results.length === 0) {
@@ -206,6 +348,14 @@ export async function getRAGContextWithCitations(
   query: string, 
   topK: number = 3
 ): Promise<RAGContextWithCitations> {
+  const remote = await fetchAssetAdminRetrieve(query, topK);
+  if (remote?.context?.trim() || (remote?.citations && remote.citations.length > 0)) {
+    return {
+      context: remote.context || "",
+      citations: remote.citations || [],
+    };
+  }
+
   const results = await retrieveRelevantContext(query, topK);
   
   if (results.length === 0) {
@@ -265,6 +415,7 @@ export async function getRAGContextWithCitations(
  * Check if the knowledge base is available
  */
 export function isKnowledgeBaseAvailable(): boolean {
+  if (usesRemoteRag()) return true;
   return knowledgeBase !== null && knowledgeBase.totalChunks > 0;
 }
 
