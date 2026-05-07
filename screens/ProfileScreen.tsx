@@ -26,8 +26,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
     setRecordingQuality,
     autoSave,
     setAutoSave,
-    isAdmin,
-    setIsAdmin,
     readingLevel,
     resetOnboarding,
     privacyConsent,
@@ -166,31 +164,6 @@ export default function ProfileScreen({ navigation }: ProfileScreenProps) {
           </View>
         </SettingSection>
 
-        {isAdmin && (
-          <Button onPress={() => navigation.navigate("AdminSources")}>
-            <Icon name="document" size={20} color="white" />
-            Manage Trusted Sources
-          </Button>
-        )}
-
-        <View style={styles.adminToggle}>
-          <Pressable
-            onPress={() => setIsAdmin(!isAdmin)}
-            style={[
-              styles.adminButton,
-              {
-                backgroundColor: isAdmin ? theme.primary : theme.backgroundSecondary,
-                borderColor: theme.border,
-              },
-            ]}
-          >
-            <Icon name="shield" size={16} color={isAdmin ? "white" : theme.textSecondary} />
-            <ThemedText style={{ color: isAdmin ? "white" : theme.textSecondary, fontSize: 12 }}>
-              {isAdmin ? "Admin Mode" : "Enable Admin"}
-            </ThemedText>
-          </Pressable>
-        </View>
-
         <View style={styles.aboutSection}>
           <Image 
             source={InspiredLogo} 
@@ -318,18 +291,6 @@ const styles = StyleSheet.create({
   redoButtonText: {
     fontSize: 14,
     fontWeight: "500",
-  },
-  adminToggle: {
-    alignItems: "center",
-  },
-  adminButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: Spacing.sm,
-    paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.sm,
-    borderRadius: BorderRadius.sm,
-    borderWidth: 1,
   },
   aboutSection: {
     alignItems: "center",

@@ -71,6 +71,30 @@ export default function RecordVisitScreen() {
   const soundRef = useRef<Audio.Sound | null>(null);
   const pulse = useSharedValue(1);
 
+  //2026: CV - Adding a ref to check if the recording is starting to avoid double recording.
+  const isStartingRecordingRef = useRef(false);
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  const safeStopAndUnloadRecording = async (rec: Audio.Recording | null) => {
+    if (!rec) return;
+    try {
+      const status: any = await rec.getStatusAsync();
+      if (!status?.isLoaded) return;
+      await rec.stopAndUnloadAsync();
+    } catch {
+      // Swallow: expo-av can throw during double-unload / races, don't show LogBox.
+    }
+  };
+
+  const safeUnloadSound = async (s: Audio.Sound | null) => {
+    if (!s) return;
+    try {
+      await s.unloadAsync();
+    } catch {
+      // Swallow: don't show LogBox.
+    }
+  };
+
   useEffect(() => {
     recordingRef.current = recording;
   }, [recording]);
@@ -134,10 +158,10 @@ export default function RecordVisitScreen() {
     void refreshRecordingPermission();
     return () => {
       if (recordingRef.current) {
-        recordingRef.current.stopAndUnloadAsync().catch(console.error);
+        void safeStopAndUnloadRecording(recordingRef.current);
       }
       if (soundRef.current) {
-        soundRef.current.unloadAsync().catch(console.error);
+        void safeUnloadSound(soundRef.current);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- init-only mic probe
@@ -184,6 +208,14 @@ export default function RecordVisitScreen() {
       console.error("Failed to delete temporary recording:", error);
     }
   };
+  
+  const persistRecordingForVisit = async (visitId: string, sourceUri: string): Promise<string> => {
+    const baseDir = `${FileSystem.documentDirectory}visits`;
+    const destUri = `${baseDir}/${visitId}.m4a`;
+    await FileSystem.makeDirectoryAsync(baseDir, { intermediates: true }).catch(() => {});
+    await FileSystem.copyAsync({ from: sourceUri, to: destUri });
+    return destUri;
+  }; //CV 2026: Holding the recording locally to be used for AI processing incase the AI is not available and need sometime to process the recording.
 
   const handleCancel = async () => {
     if (isRecording || seconds > 0) {
@@ -248,14 +280,33 @@ export default function RecordVisitScreen() {
       return;
     }
 
+    if (isStartingRecordingRef.current) return;
+    isStartingRecordingRef.current = true;
+
     const granted = await refreshRecordingPermission();
     if (!granted) {
       alertMicDenied();
+      isStartingRecordingRef.current = false;
       return;
     }
 
     try {
+      // If we were in Review playback, release the sound first.
+      await safeUnloadSound(soundRef.current);
+      setSound(null);
+      soundRef.current = null;
+
+      // Ensure the previous recorder is fully released (2nd recording reliability).
+      await safeStopAndUnloadRecording(recordingRef.current);
+
       if (Platform.OS !== "web") {
+        await Audio.setAudioModeAsync({
+          allowsRecordingIOS: false,
+          playsInSilentModeIOS: true,
+        });
+        if (Platform.OS === "ios") {
+          await sleep(250);
+        }
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: true,
           playsInSilentModeIOS: true,
@@ -280,6 +331,8 @@ export default function RecordVisitScreen() {
         "Recording Error",
         `Could not start recording.${suffix} Please try again.`
       );
+    } finally {
+      isStartingRecordingRef.current = false;
     }
   };
 
@@ -422,12 +475,18 @@ export default function RecordVisitScreen() {
       setProcessingStatus("transcribing");
 
       const visitId = Date.now().toString();
+      // Persist audio locally so we don't lose the conversation if AI is unavailable.
+      const persistedAudioUri = await persistRecordingForVisit(visitId, recordedUri);
+      // We no longer need the temp file after copying.
+      await cleanupRecordingFile(recordedUri);
+      setRecordedUri(persistedAudioUri);
+
       const visit = {
         id: visitId,
         date: new Date(),
         doctorName: doctorName || "Not specified",
         duration: seconds,
-        audioUri: "",
+        audioUri: persistedAudioUri,
         transcription: null,
         summary: null,
         keyPoints: [],
@@ -439,7 +498,7 @@ export default function RecordVisitScreen() {
       addVisit(visit);
       
       try {
-        const transcription = await transcribeVisitAudio(recordedUri, "audio/m4a");
+        const transcription = await transcribeVisitAudio(persistedAudioUri, "audio/m4a");
         setTranscriptionResult(transcription);
         setProcessingStatus("summarizing");
 
@@ -455,16 +514,16 @@ export default function RecordVisitScreen() {
           actions: structured.actions,
           medicalTerms: structured.medicalTerms,
           isProcessing: false,
+          // AI succeeded: remove local audio for privacy.
+          audioUri: "",
         });
-        await cleanupRecordingFile(recordedUri);
+        await cleanupRecordingFile(persistedAudioUri);
         setRecordedUri(null);
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
-        console.error("Failed to process audio:", errorMessage);
         updateVisit(visitId, {
           isProcessing: false,
         });
-        await cleanupRecordingFile(recordedUri);
         setRecordedUri(null);
         setProcessingMode(false);
         
@@ -473,7 +532,7 @@ export default function RecordVisitScreen() {
         const title = isWebLimitation ? "Web Limitation" : "Processing Failed";
         const message = isWebLimitation 
           ? "Audio transcription requires the Expo Go app on your phone. The visit was saved without transcription. Please use the QR code to open InspirEd on your mobile device for full functionality."
-          : `Could not transcribe the recording: ${errorMessage}. The visit was saved without transcription.`;
+          : `Could not transcribe the recording right now. Your visit was saved and the recording was kept on this device so you don't lose anything. Please try again later.`;
         
         if (Platform.OS === "web") {
           window.alert(`${title}\n\n${message}`);

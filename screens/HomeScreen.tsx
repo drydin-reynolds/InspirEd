@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   statValue: {
-    fontSize: 28,
+    fontSize: 24,
     fontWeight: "700",
   },
   statLabel: {

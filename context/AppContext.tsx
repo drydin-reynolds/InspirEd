@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as FileSystem from "expo-file-system/legacy";
 
 export type Visit = {
   id: string;
@@ -275,6 +276,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const deleteVisit = (id: string) => {
     setVisits((prev) => {
+      const target = prev.find((v) => v.id === id);
+      if (target?.audioUri) {
+        FileSystem.deleteAsync(target.audioUri, { idempotent: true }).catch(() => {});
+      }
       const filteredVisits = prev.filter((visit) => visit.id !== id);
       AsyncStorage.setItem(STORAGE_KEYS.VISITS, JSON.stringify(filteredVisits)).catch((error) =>
         console.error("Error deleting visit:", error)
@@ -496,6 +501,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const clearAllData = async () => {
     try {
+      // Best-effort cleanup of any locally persisted audio files.
+      await Promise.all(
+        visits
+          .map((v) => v.audioUri)
+          .filter((uri): uri is string => typeof uri === "string" && uri.length > 0)
+          .map((uri) => FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {}))
+      );
       await AsyncStorage.multiRemove([
         STORAGE_KEYS.VISITS,
         STORAGE_KEYS.CHAT_MESSAGES,

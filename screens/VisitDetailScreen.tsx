@@ -1,5 +1,5 @@
 import React from "react";
-import { View, StyleSheet, Pressable } from "react-native";
+import { View, StyleSheet } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
 import { ScreenScrollView } from "@/components/ScreenScrollView";
@@ -33,17 +33,6 @@ export default function VisitDetailScreen() {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
-          <View style={styles.cardHeader}>
-            <Icon name="headset" size={24} color={theme.primary} />
-            <ThemedText style={styles.cardTitle}>Recording</ThemedText>
-          </View>
-          <Button onPress={() => {}}>
-            <Icon name="play" size={20} color="white" />
-            Play Recording
-          </Button>
-        </ThemedView>
-
         {visit.summary && (
           <ThemedView style={[styles.card, { backgroundColor: theme.backgroundSecondary }]}>
             <View style={styles.cardHeader}>
