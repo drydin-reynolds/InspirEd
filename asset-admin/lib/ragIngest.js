@@ -4,6 +4,23 @@ const Asset = require('../models/Asset')
 const Chunk = require('../models/Chunk')
 const { embedText, extractTextFromPdfBuffer } = require('./geminiRag')
 
+/**
+ * Local text extraction for PDFs when Gemini returns nothing (scanned PDFs, API limits, etc.).
+ * @param {Buffer} buffer
+ * @returns {Promise<string>}
+ */
+async function extractPdfTextWithPdfParse(buffer) {
+  try {
+    const pdfParse = require('pdf-parse')
+    const data = await pdfParse(buffer)
+    return (data && data.text) || ''
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    console.warn('[ragIngest] pdf-parse failed:', msg)
+    return ''
+  }
+}
+
 const UPLOAD_DIR = path.join(__dirname, '..', 'uploads')
 
 const CHUNK_WORDS = 800
@@ -22,6 +39,17 @@ function absoluteUploadPath(storedPath) {
 function chunkWords(text, sourceLabel) {
   const words = text.split(/\s+/).filter((w) => w.length > 0)
   const chunks = []
+  if (words.length === 0) return []
+  // Short documents: one chunk (sliding window requires min 50 words)
+  if (words.length < 50) {
+    return [
+      {
+        id: `${sourceLabel}_chunk_0`,
+        text: words.join(' '),
+        chunkIndex: 0
+      }
+    ]
+  }
   for (let i = 0; i < words.length; i += CHUNK_WORDS - CHUNK_OVERLAP) {
     const slice = words.slice(i, i + CHUNK_WORDS)
     if (slice.length < 50) continue
@@ -46,14 +74,29 @@ async function extractAllText(asset, apiKey) {
   const mainPath = absoluteUploadPath(asset.file_path)
   const transcriptPath = absoluteUploadPath(asset.transcript_file_path)
 
+  if (asset.file_path && mainPath && !fs.existsSync(mainPath)) {
+    throw new Error(
+      `Upload file is missing on the server (${path.basename(mainPath)}). The file may have been deleted from asset-admin/uploads — re-upload the asset.`
+    )
+  }
+
   if (mainPath && fs.existsSync(mainPath)) {
     const ext = path.extname(mainPath).toLowerCase()
     if (['.txt', '.html'].includes(ext)) {
       parts.push(fs.readFileSync(mainPath, 'utf8'))
     } else if (ext === '.pdf') {
       const buf = fs.readFileSync(mainPath)
-      const pdfText = await extractTextFromPdfBuffer(buf, apiKey)
-      parts.push(pdfText)
+      let pdfText = (await extractTextFromPdfBuffer(buf, apiKey)) || ''
+      if (!pdfText.trim()) {
+        pdfText = await extractPdfTextWithPdfParse(buf)
+      }
+      if (pdfText.trim()) {
+        parts.push(pdfText)
+      } else {
+        throw new Error(
+          'Could not read text from this PDF (Gemini and local extract both returned empty). It may be a scanned image PDF with no text layer — add a .txt or .vtt transcript, or use a text-based PDF.'
+        )
+      }
     } else if (['.png', '.jpg', '.jpeg'].includes(ext)) {
       parts.push(
         `[Visual asset: ${asset.original_filename || 'image'}. Alt text for educators: ${asset.alt_text || 'not provided'}. RAG text extraction for raw images is not enabled in prototype — add a transcript file for richer retrieval.]`
@@ -61,6 +104,10 @@ async function extractAllText(asset, apiKey) {
     } else if (['.mp4', '.mov'].includes(ext)) {
       parts.push(
         `[Video asset: ${asset.original_filename || 'video'}. Use an uploaded transcript for text-based RAG.]`
+      )
+    } else {
+      throw new Error(
+        `RAG ingest does not support this file type (${ext || 'unknown'}) yet. Add a .txt/.vtt/.srt transcript or convert to PDF/TXT/HTML.`
       )
     }
   }
@@ -72,7 +119,13 @@ async function extractAllText(asset, apiKey) {
     }
   }
 
-  return parts.filter(Boolean).join('\n\n')
+  if (!parts.length && !mainPath) {
+    throw new Error(
+      'No file or transcript for RAG. Upload a PDF/TXT/HTML or a transcript (.txt/.vtt/.srt) in Edit.'
+    )
+  }
+
+  return parts.filter((p) => p && String(p).trim()).join('\n\n')
 }
 
 /**
