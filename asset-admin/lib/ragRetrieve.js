@@ -25,6 +25,42 @@ function formatSourceLabel(chunk) {
 }
 
 /**
+ * Keep the highest-similarity chunk per logical source:
+ * - Mongo `asset` ObjectId (same PDF ingest path)
+ * - `sourceAssetId` slug when two Asset rows share the same catalog id (re-upload / duplicate rows)
+ * Rare chunks missing both use `_id` only.
+ */
+function dedupeResultsByAsset(results) {
+  const seenAssetIds = new Set()
+  const seenSourceSlugs = new Set()
+  const seenChunkIds = new Set()
+  const out = []
+  for (const r of results) {
+    const chunk = r.chunk
+    const aid = chunk.asset ? String(chunk.asset) : ''
+    const slug =
+      chunk.sourceAssetId != null
+        ? String(chunk.sourceAssetId).trim().toLowerCase()
+        : ''
+
+    if (aid && seenAssetIds.has(aid)) continue
+    if (slug && seenSourceSlugs.has(slug)) continue
+    if (!aid && !slug) {
+      const cid = String(chunk._id)
+      if (seenChunkIds.has(cid)) continue
+      seenChunkIds.add(cid)
+      out.push(r)
+      continue
+    }
+
+    if (aid) seenAssetIds.add(aid)
+    if (slug) seenSourceSlugs.add(slug)
+    out.push(r)
+  }
+  return out
+}
+
+/**
  * Brute-force retrieval over stored embeddings (prototype scale).
  * Replace with Atlas $vectorSearch at larger corpus sizes.
  *
@@ -60,8 +96,9 @@ async function retrieveChunks(query, options = {}) {
   }
 
   results.sort((a, b) => b.similarity - a.similarity)
+  const deduped = dedupeResultsByAsset(results)
   return {
-    results: results.slice(0, topK),
+    results: deduped.slice(0, topK),
     queryEmbedding
   }
 }

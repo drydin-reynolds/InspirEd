@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { View, StyleSheet, TextInput, Pressable, FlatList, KeyboardAvoidingView, Platform, Keyboard } from "react-native";
 import { ThemedText } from "@/components/ThemedText";
 import { ThemedView } from "@/components/ThemedView";
@@ -16,6 +16,13 @@ import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller
 
 const TAB_BAR_HEIGHT = 80;
 
+const CHAT_INPUT_LINE_HEIGHT = 20;
+const CHAT_INPUT_MAX_LINES = 9;
+const CHAT_INPUT_PAD_V = Spacing.xs * 2;
+const CHAT_INPUT_MIN_HEIGHT = CHAT_INPUT_LINE_HEIGHT + CHAT_INPUT_PAD_V;
+const CHAT_INPUT_MAX_HEIGHT =
+  CHAT_INPUT_LINE_HEIGHT * CHAT_INPUT_MAX_LINES + CHAT_INPUT_PAD_V;
+
 export default function ChatScreen() {
   const { theme } = useTheme();
   const { chatMessages, addChatMessage, visits, readingLevel } = useAppContext();
@@ -27,7 +34,24 @@ export default function ChatScreen() {
   
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  
+  const [composerInputHeight, setComposerInputHeight] = useState(
+    CHAT_INPUT_MIN_HEIGHT,
+  );
+  const prevComposerLengthRef = useRef(0);
+
+  const handleComposerTextChange = useCallback((text: string) => {
+    setInputText(text);
+    if (text.length === 0) {
+      setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+      prevComposerLengthRef.current = 0;
+      return;
+    }
+    if (prevComposerLengthRef.current > text.length) {
+      setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+    }
+    prevComposerLengthRef.current = text.length;
+  }, []);
+
   const messages = chatMessages[visitId] || [];
   const visit = visits.find((v) => v.id === visitId);
   
@@ -57,6 +81,8 @@ export default function ChatScreen() {
 
     addChatMessage(visitId, userMessage);
     setInputText("");
+    setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+    prevComposerLengthRef.current = 0;
     setIsLoading(true);
 
     const response = await askQuestionWithGemini(
@@ -84,6 +110,10 @@ export default function ChatScreen() {
   };
 
   const inputAreaHeight = 70 + TAB_BAR_HEIGHT;
+  const composerGrowExtra = Math.max(
+    0,
+    composerInputHeight - CHAT_INPUT_MIN_HEIGHT,
+  );
 
   return (
     <View style={[styles.container, { backgroundColor: theme.backgroundRoot }]}>
@@ -95,7 +125,8 @@ export default function ChatScreen() {
           styles.messageList,
           { 
             paddingTop: headerHeight + Spacing.md,
-            paddingBottom: inputAreaHeight + Spacing.lg,
+            paddingBottom:
+              inputAreaHeight + composerGrowExtra + Spacing.lg,
             flexGrow: 1,
           },
         ]}
@@ -129,21 +160,45 @@ export default function ChatScreen() {
           animatedInputStyle,
         ]}
       >
-        <TextInput
-          style={[
-            styles.input,
-            {
-              backgroundColor: theme.backgroundDefault,
-              color: theme.text,
-            },
-          ]}
-          value={inputText}
-          onChangeText={setInputText}
-          placeholder="Ask about this visit..."
-          placeholderTextColor={theme.textSecondary}
-          multiline
-          maxLength={500}
-        />
+        <View style={styles.inputFieldGrow}>
+          <TextInput
+            style={[
+              styles.input,
+              {
+                backgroundColor: theme.backgroundDefault,
+                color: theme.text,
+                minHeight: composerInputHeight,
+                maxHeight: CHAT_INPUT_MAX_HEIGHT,
+              },
+              Platform.OS === "android" ? { includeFontPadding: false } : null,
+            ]}
+            value={inputText}
+            onChangeText={handleComposerTextChange}
+            placeholder="Ask about this visit..."
+            placeholderTextColor={theme.textSecondary}
+            multiline
+            maxLength={500}
+            textAlignVertical="top"
+            blurOnSubmit={false}
+            underlineColorAndroid="transparent"
+            {...(Platform.OS === "ios"
+              ? ({ submitBehavior: "newline" } as const)
+              : {})}
+            scrollEnabled={
+              composerInputHeight >= CHAT_INPUT_MAX_HEIGHT - 2
+            }
+            onContentSizeChange={(e) => {
+              const h = e.nativeEvent.contentSize.height;
+              if (!Number.isFinite(h)) return;
+              if (h > CHAT_INPUT_MAX_HEIGHT + 24) return;
+              const clamped = Math.min(
+                Math.max(Math.ceil(h), CHAT_INPUT_MIN_HEIGHT),
+                CHAT_INPUT_MAX_HEIGHT,
+              );
+              setComposerInputHeight(clamped);
+            }}
+          />
+        </View>
         <Pressable
           onPress={handleSend}
           disabled={!inputText.trim() || isLoading}
@@ -228,17 +283,22 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: "row",
+    alignItems: "flex-end",
     padding: Spacing.md,
     gap: Spacing.sm,
     borderTopWidth: 1,
   },
-  input: {
+  inputFieldGrow: {
     flex: 1,
-    maxHeight: 100,
+    minWidth: 0,
+  },
+  input: {
+    width: "100%",
     borderRadius: BorderRadius.md,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
     fontSize: 15,
+    lineHeight: CHAT_INPUT_LINE_HEIGHT,
   },
   sendButton: {
     width: 44,

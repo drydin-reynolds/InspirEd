@@ -114,6 +114,20 @@ export default function EducationScreen() {
   const [composerInputHeight, setComposerInputHeight] = useState(
     CHAT_INPUT_MIN_HEIGHT,
   );
+  const prevComposerLengthRef = useRef(0);
+
+  const handleComposerTextChange = useCallback((text: string) => {
+    setInputText(text);
+    if (text.length === 0) {
+      setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+      prevComposerLengthRef.current = 0;
+      return;
+    }
+    if (prevComposerLengthRef.current > text.length) {
+      setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+    }
+    prevComposerLengthRef.current = text.length;
+  }, []);
 
   const animatedChatInputStyle = useAnimatedStyle(
     () => ({
@@ -140,15 +154,20 @@ export default function EducationScreen() {
       const flatIndex = educationChatMessages.findIndex(
         (m) => m.id === messageId,
       );
-      if (flatIndex >= 0) {
-        requestAnimationFrame(() => {
-          flatListRef.current?.scrollToIndex({
-            index: flatIndex,
-            viewPosition: 0.35,
-            animated: true,
-          });
+      if (flatIndex < 0) return;
+
+      const scrollToMessage = () => {
+        flatListRef.current?.scrollToIndex({
+          index: flatIndex,
+          viewPosition: 1,
+          animated: true,
         });
-      }
+      };
+
+      requestAnimationFrame(() => {
+        scrollToMessage();
+        setTimeout(scrollToMessage, 85);
+      });
     },
     [educationChatMessages],
   );
@@ -167,6 +186,7 @@ export default function EducationScreen() {
     addEducationChatMessage(userMessage);
     setInputText("");
     setComposerInputHeight(CHAT_INPUT_MIN_HEIGHT);
+    prevComposerLengthRef.current = 0;
     setIsLoading(true);
 
     const conversationHistory = [
@@ -377,34 +397,46 @@ export default function EducationScreen() {
                 { backgroundColor: theme.backgroundSecondary },
               ]}
             >
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.text,
-                    height: composerInputHeight,
-                    maxHeight: CHAT_INPUT_MAX_HEIGHT,
-                  },
-                ]}
-                value={inputText}
-                onChangeText={setInputText}
-                placeholder="Ask a question..."
-                placeholderTextColor={theme.textSecondary}
-                multiline
-                maxLength={500}
-                textAlignVertical="top"
-                scrollEnabled={composerInputHeight >= CHAT_INPUT_MAX_HEIGHT - 2}
-                onContentSizeChange={(e) => {
-                  const h = e.nativeEvent.contentSize.height;
-                  if (!Number.isFinite(h)) return;
-                  if (h > CHAT_INPUT_MAX_HEIGHT + 24) return;
-                  const clamped = Math.min(
-                    Math.max(h, CHAT_INPUT_MIN_HEIGHT),
-                    CHAT_INPUT_MAX_HEIGHT,
-                  );
-                  setComposerInputHeight(Math.ceil(clamped));
-                }}
-              />
+              <View style={styles.inputFieldGrow}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    {
+                      color: theme.text,
+                      minHeight: composerInputHeight,
+                      maxHeight: CHAT_INPUT_MAX_HEIGHT,
+                    },
+                    Platform.OS === "android"
+                      ? { includeFontPadding: false }
+                      : null,
+                  ]}
+                  value={inputText}
+                  onChangeText={handleComposerTextChange}
+                  placeholder="Ask a question..."
+                  placeholderTextColor={theme.textSecondary}
+                  multiline
+                  maxLength={500}
+                  textAlignVertical="top"
+                  blurOnSubmit={false}
+                  underlineColorAndroid="transparent"
+                  {...(Platform.OS === "ios"
+                    ? ({ submitBehavior: "newline" } as const)
+                    : {})}
+                  scrollEnabled={
+                    composerInputHeight >= CHAT_INPUT_MAX_HEIGHT - 2
+                  }
+                  onContentSizeChange={(e) => {
+                    const h = e.nativeEvent.contentSize.height;
+                    if (!Number.isFinite(h)) return;
+                    if (h > CHAT_INPUT_MAX_HEIGHT + 24) return;
+                    const clamped = Math.min(
+                      Math.max(Math.ceil(h), CHAT_INPUT_MIN_HEIGHT),
+                      CHAT_INPUT_MAX_HEIGHT,
+                    );
+                    setComposerInputHeight(clamped);
+                  }}
+                />
+              </View>
               <Button
                 onPress={handleAskQuestion}
                 disabled={!inputText.trim() || isLoading}
@@ -511,6 +543,116 @@ function paragraphNeedsBlockMarkdown(p: string): boolean {
   return /^\s*[-*]\s/m.test(p) || /^\s*\d+[.)]\s/m.test(p);
 }
 
+/** Matches `[1]` or `[1, 2]` (comma-separated indices in one bracket group). */
+const CITATION_BRACKET_SPLIT_RE = /(\[(?:\d+(?:\s*,\s*\d+)*)\])/g;
+
+function paragraphHasCitationBrackets(p: string): boolean {
+  return /\[(?:\d+(?:\s*,\s*\d+)*)\]/.test(p);
+}
+
+function CitationChipText({
+  n,
+  theme,
+  citationCount,
+  onCitationChip,
+}: {
+  n: number;
+  theme: { text: string; primary: string; textSecondary: string };
+  citationCount: number;
+  onCitationChip: (n: number) => void;
+}) {
+  const valid = n >= 1 && n <= citationCount;
+  return (
+    <Text
+      onPress={valid ? () => onCitationChip(n) : undefined}
+      style={{
+        color: valid ? theme.primary : theme.textSecondary,
+        fontWeight: "700",
+        fontSize: 15,
+        lineHeight: 22,
+        ...(valid ? { textDecorationLine: "underline" as const } : {}),
+      }}
+    >
+      [{n}]
+    </Text>
+  );
+}
+
+function renderInlineCitationChildren(
+  segment: string,
+  theme: { text: string; primary: string; textSecondary: string },
+  citationCount: number,
+  onCitationChip: (n: number) => void,
+): React.ReactNode {
+  const parts = segment
+    .split(CITATION_BRACKET_SPLIT_RE)
+    .filter((x) => x.length > 0);
+  const isBracketToken = (s: string) =>
+    /^\[(?:\d+(?:\s*,\s*\d+)*)\]$/.test(s.trim());
+
+  return parts.map((p, i) => {
+    if (isBracketToken(p)) {
+      const nums =
+        p
+          .slice(1, -1)
+          .match(/\d+/g)
+          ?.map((x) => parseInt(x, 10)) ?? [];
+      return (
+        <Text key={i}>
+          {nums.flatMap((n, ni) =>
+            ni === 0
+              ? [
+                  <CitationChipText
+                    key={`${i}-0`}
+                    n={n}
+                    theme={theme}
+                    citationCount={citationCount}
+                    onCitationChip={onCitationChip}
+                  />,
+                ]
+              : [
+                  <Text
+                    key={`${i}-sep-${ni}`}
+                    style={{
+                      fontSize: 15,
+                      lineHeight: 22,
+                      color: theme.text,
+                    }}
+                  >
+                    ,{" "}
+                  </Text>,
+                  <CitationChipText
+                    key={`${i}-${ni}`}
+                    n={n}
+                    theme={theme}
+                    citationCount={citationCount}
+                    onCitationChip={onCitationChip}
+                  />,
+                ],
+          )}
+        </Text>
+      );
+    }
+    const segs = parseInlineFormatting(p);
+    return (
+      <Text key={i}>
+        {segs.map((seg, j) => (
+          <Text
+            key={j}
+            style={[
+              { fontSize: 15, lineHeight: 22, color: theme.text },
+              seg.bold && { fontWeight: "700" as const },
+              seg.italic && { fontStyle: "italic" as const },
+            ]}
+          >
+            {seg.text}
+          </Text>
+        ))}
+      </Text>
+    );
+  });
+}
+
 function ParagraphInlineCitations({
   para,
   theme,
@@ -522,7 +664,6 @@ function ParagraphInlineCitations({
   citationCount: number;
   onCitationChip: (n: number) => void;
 }) {
-  const parts = para.split(/(\[\d+\])/g).filter((x) => x.length > 0);
   return (
     <Text
       style={{
@@ -532,44 +673,67 @@ function ParagraphInlineCitations({
         marginBottom: Spacing.sm,
       }}
     >
-      {parts.map((p, i) => {
-        const m = p.match(/^\[(\d+)\]$/);
-        if (m) {
-          const n = parseInt(m[1], 10);
-          const valid = n >= 1 && n <= citationCount;
-          return (
-            <Text
-              key={i}
-              onPress={valid ? () => onCitationChip(n) : undefined}
-              style={{
-                color: valid ? theme.primary : theme.textSecondary,
-                fontWeight: "700",
-                ...(valid ? { textDecorationLine: "underline" as const } : {}),
-              }}
-            >
-              [{n}]
-            </Text>
-          );
-        }
-        const segs = parseInlineFormatting(p);
+      {renderInlineCitationChildren(
+        para,
+        theme,
+        citationCount,
+        onCitationChip,
+      )}
+    </Text>
+  );
+}
+
+const LIST_LINE_PREFIX_RE = /^(\s*(?:[-*]\s+|\d+[.)]\s+))(.*)$/;
+
+function ListParagraphWithCitations({
+  para,
+  theme,
+  citationCount,
+  onCitationChip,
+}: {
+  para: string;
+  theme: { text: string; primary: string; textSecondary: string };
+  citationCount: number;
+  onCitationChip: (n: number) => void;
+}) {
+  const lines = para.split("\n");
+  return (
+    <View style={{ marginBottom: Spacing.sm }}>
+      {lines.map((line, li) => {
+        const m = line.match(LIST_LINE_PREFIX_RE);
+        const prefix = m ? m[1] : "";
+        const body = m ? m[2] : line;
         return (
-          <Text key={i}>
-            {segs.map((seg, j) => (
+          <Text
+            key={li}
+            style={{
+              fontSize: 15,
+              lineHeight: 22,
+              color: theme.text,
+              marginBottom: li < lines.length - 1 ? Spacing.xs : 0,
+            }}
+          >
+            {prefix ? (
               <Text
-                key={j}
-                style={[
-                  { fontSize: 15, lineHeight: 22, color: theme.text },
-                  seg.bold && { fontWeight: "700" as const },
-                  seg.italic && { fontStyle: "italic" as const },
-                ]}
+                style={{
+                  fontSize: 15,
+                  lineHeight: 22,
+                  color: theme.text,
+                }}
               >
-                {seg.text}
+                {prefix}
               </Text>
-            ))}
+            ) : null}
+            {renderInlineCitationChildren(
+              body,
+              theme,
+              citationCount,
+              onCitationChip,
+            )}
           </Text>
         );
       })}
-    </Text>
+    </View>
   );
 }
 
@@ -588,34 +752,39 @@ function AssistantMessageWithCitations({
   return (
     <View>
       {paragraphs.map((para, i) => {
-        if (paragraphNeedsBlockMarkdown(para)) {
+        const blockMd = paragraphNeedsBlockMarkdown(para);
+        const hasCit = paragraphHasCitationBrackets(para);
+        const paraGap =
+          i < paragraphs.length - 1 ? { marginBottom: Spacing.sm } : undefined;
+
+        if (blockMd && hasCit) {
           return (
-            <View
+            <ListParagraphWithCitations
               key={i}
-              style={
-                i < paragraphs.length - 1
-                  ? { marginBottom: Spacing.sm }
-                  : undefined
-              }
-            >
+              para={para}
+              theme={theme}
+              citationCount={citations.length}
+              onCitationChip={onCitationChip}
+            />
+          );
+        }
+
+        if (blockMd) {
+          return (
+            <View key={i} style={paraGap}>
               <MarkdownText color={theme.text}>{para}</MarkdownText>
             </View>
           );
         }
-        if (!/\[\d+\]/.test(para)) {
+
+        if (!hasCit) {
           return (
-            <View
-              key={i}
-              style={
-                i < paragraphs.length - 1
-                  ? { marginBottom: Spacing.sm }
-                  : undefined
-              }
-            >
+            <View key={i} style={paraGap}>
               <MarkdownText color={theme.text}>{para}</MarkdownText>
             </View>
           );
         }
+
         return (
           <ParagraphInlineCitations
             key={i}
@@ -1055,6 +1224,12 @@ const styles = StyleSheet.create({
     borderRadius: BorderRadius.md,
     flexDirection: "row",
     alignItems: "flex-end",
+    width: "100%",
+  },
+  /** Lets multiline TextInput wrap and grow inside a row (`minWidth: 0` / flex quirk). */
+  inputFieldGrow: {
+    flex: 1,
+    minWidth: 0,
   },
   /** Shorter composer bar so less of the thread is obscured. */
   inputCardCompact: {
@@ -1070,7 +1245,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
   },
   input: {
-    flex: 1,
+    width: "100%",
     fontSize: 15,
     lineHeight: CHAT_INPUT_LINE_HEIGHT,
     paddingVertical: Spacing.xs,
