@@ -34,9 +34,51 @@ import * as FileSystem from "expo-file-system/legacy";
  * - Migrate away from expo-av before it's fully removed from Expo
  */
 
+/** Gemini / network errors are not always `Error` instances — normalize for messaging. */
+function stringifyUnknownError(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === "string") return err;
+  if (err && typeof err === "object") {
+    const o = err as Record<string, unknown>;
+    if (typeof o.message === "string") return o.message;
+    const nested = o.error;
+    if (nested && typeof nested === "object") {
+      const n = nested as Record<string, unknown>;
+      if (typeof n.message === "string") return n.message;
+    }
+    try {
+      return JSON.stringify(o);
+    } catch {
+      return String(err);
+    }
+  }
+  return String(err ?? "Unknown error");
+}
+//2026 Cv: Dev Only, recommend changing for production level
+function userFacingTranscriptionHint(raw: string): string {
+  const lower = raw.toLowerCase();
+  if (lower.includes("503") || lower.includes("unavailable") || lower.includes("high demand")) {
+    return "The AI service is busy. Wait a minute, then tap “Try transcribe again”.";
+  }
+  if (lower.includes("429") || lower.includes("quota") || lower.includes("resource_exhausted")) {
+    return "AI usage limit reached. Try again later or check your Google AI quota.";
+  }
+  if (lower.includes("401") || lower.includes("api_key") || lower.includes("permission_denied") || lower.includes("invalid api key")) {
+    return "There’s a problem with the Gemini API key. Fix the key, restart the app, then try again.";
+  }
+  if (lower.includes("gemini_api_key") || lower.includes("not configured")) {
+    return "Gemini API key is missing. Add it in app config / env and restart.";
+  }
+  if (lower.includes("network") || lower.includes("fetch") || lower.includes("timeout")) {
+    return "Network issue — check your connection and try again.";
+  }
+  return "Something went wrong while transcribing. Your recording is still saved — tap “Try transcribe again” when ready.";
+}
+
 export default function RecordVisitScreen() {
   const { theme } = useTheme();
-  const { addVisit, updateVisit, readingLevel, privacyConsent, setPrivacyConsent, plannerQuestions, updatePlannerQuestion } = useAppContext();
+  const { addVisit, updateVisit, deleteVisit, readingLevel, privacyConsent, setPrivacyConsent, plannerQuestions, updatePlannerQuestion } =
+    useAppContext();
   const navigation = useNavigation<any>();
   const insets = useSafeAreaInsets();
   
@@ -73,6 +115,8 @@ export default function RecordVisitScreen() {
 
   //2026: CV - Adding a ref to check if the recording is starting to avoid double recording.
   const isStartingRecordingRef = useRef(false);
+  /** After transcription fails, next Save reuses this visit (no duplicate). */
+  const [pendingRetryVisitId, setPendingRetryVisitId] = useState<string | null>(null);
   const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
   const safeStopAndUnloadRecording = async (rec: Audio.Recording | null) => {
@@ -446,6 +490,11 @@ export default function RecordVisitScreen() {
       }
       setSound(null);
     }
+
+    if (pendingRetryVisitId) {
+      deleteVisit(pendingRetryVisitId);
+      setPendingRetryVisitId(null);
+    }
     
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
@@ -462,71 +511,89 @@ export default function RecordVisitScreen() {
     setDoctorName("");
   };
 
+  const runTranscriptionForVisit = async (visitId: string, persistedAudioUri: string) => {
+    const transcription = await transcribeVisitAudio(persistedAudioUri, "audio/m4a");
+    setTranscriptionResult(transcription);
+    setProcessingStatus("summarizing");
+
+    const structured = await structureVisitFromTranscription(transcription, readingLevel);
+    setSummaryResult(structured.summary);
+    setProcessingStatus("complete");
+
+    updateVisit(visitId, {
+      transcription,
+      summary: structured.summary,
+      keyPoints: structured.keyPoints,
+      diagnoses: structured.diagnoses,
+      actions: structured.actions,
+      medicalTerms: structured.medicalTerms,
+      isProcessing: false,
+      audioUri: "",
+    });
+    await cleanupRecordingFile(persistedAudioUri);
+    setRecordedUri(null);
+    setPendingRetryVisitId(null);
+  };
+
   const handleSaveVisit = async () => {
     if (!recordedUri) return;
     
     try {
-      if (sound) {
-        await sound.unloadAsync();
-        setSound(null);
-      }
+      await safeUnloadSound(soundRef.current);
+      setSound(null);
+      soundRef.current = null;
 
       setProcessingMode(true);
       setProcessingStatus("transcribing");
 
-      const visitId = Date.now().toString();
-      // Persist audio locally so we don't lose the conversation if AI is unavailable.
-      const persistedAudioUri = await persistRecordingForVisit(visitId, recordedUri);
-      // We no longer need the temp file after copying.
-      await cleanupRecordingFile(recordedUri);
-      setRecordedUri(persistedAudioUri);
+      const isRetry = pendingRetryVisitId !== null;
+      let visitId: string;
+      let persistedAudioUri: string;
 
-      const visit = {
-        id: visitId,
-        date: new Date(),
-        doctorName: doctorName || "Not specified",
-        duration: seconds,
-        audioUri: persistedAudioUri,
-        transcription: null,
-        summary: null,
-        keyPoints: [],
-        diagnoses: [],
-        actions: [],
-        medicalTerms: [],
-        isProcessing: true,
-      };
-      addVisit(visit);
+      if (isRetry) {
+        visitId = pendingRetryVisitId as string;
+        persistedAudioUri = recordedUri;
+        updateVisit(visitId, {
+          doctorName: doctorName || "Not specified",
+          isProcessing: true,
+        });
+      } else {
+        visitId = Date.now().toString();
+        persistedAudioUri = await persistRecordingForVisit(visitId, recordedUri);
+        await cleanupRecordingFile(recordedUri);
+        setRecordedUri(persistedAudioUri);
+
+        addVisit({
+          id: visitId,
+          date: new Date(),
+          doctorName: doctorName || "Not specified",
+          duration: seconds,
+          audioUri: persistedAudioUri,
+          transcription: null,
+          summary: null,
+          keyPoints: [],
+          diagnoses: [],
+          actions: [],
+          medicalTerms: [],
+          isProcessing: true,
+        });
+      }
       
       try {
-        const transcription = await transcribeVisitAudio(persistedAudioUri, "audio/m4a");
-        setTranscriptionResult(transcription);
-        setProcessingStatus("summarizing");
-
-        const structured = await structureVisitFromTranscription(transcription, readingLevel);
-        setSummaryResult(structured.summary);
-        setProcessingStatus("complete");
-
-        updateVisit(visitId, {
-          transcription,
-          summary: structured.summary,
-          keyPoints: structured.keyPoints,
-          diagnoses: structured.diagnoses,
-          actions: structured.actions,
-          medicalTerms: structured.medicalTerms,
-          isProcessing: false,
-          // AI succeeded: remove local audio for privacy.
-          audioUri: "",
-        });
-        await cleanupRecordingFile(persistedAudioUri);
-        setRecordedUri(null);
+        await runTranscriptionForVisit(visitId, persistedAudioUri);
       } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorMessage = stringifyUnknownError(error);
         updateVisit(visitId, {
           isProcessing: false,
         });
-        setRecordedUri(null);
+        setPendingRetryVisitId(visitId);
+
         setProcessingMode(false);
-        
+        setReviewMode(true);
+        setRecordedUri(persistedAudioUri);
+
+        await loadAudioForPlayback(persistedAudioUri);
+
         const isWebLimitation = Platform.OS === "web" || errorMessage.includes("not available on web");
         
         const title = isWebLimitation ? "Web Limitation" : "Processing Failed";
@@ -538,7 +605,7 @@ export default function RecordVisitScreen() {
           window.alert(`${title}\n\n${message}`);
           navigation.goBack();
         } else {
-          Alert.alert(title, message, [{ text: "OK", onPress: () => navigation.goBack() }]);
+          Alert.alert(title, message, [{ text: "OK" }]);
         }
       }
     } catch (error) {
@@ -812,7 +879,7 @@ export default function RecordVisitScreen() {
             >
               <Icon name="check" size={20} color={theme.primary} />
               <ThemedText style={[styles.reviewButtonText, { color: theme.primary }]}>
-                Save Visit
+                {pendingRetryVisitId ? "Try transcribe again" : "Save Visit"}
               </ThemedText>
             </Pressable>
           </View>
