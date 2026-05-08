@@ -284,6 +284,13 @@ export default function EducationScreen() {
         fetchRecommended();
     }, []);
 
+    const filteredRecommended = recommended.filter((item) => {
+        const base = assetToLearningModule(item);
+        const stored = moduleMap.get(base.id);
+
+        return !(stored?.completed ?? false);
+    }).slice(0, 3);
+
   if (showChat) {
     return (
       <View
@@ -578,12 +585,12 @@ export default function EducationScreen() {
                 <ThemedText style={{ color: theme.textSecondary }}>
                     Loading...
                 </ThemedText>
-            ) : recommended.length === 0 ? (
+            ) : filteredRecommended.length === 0 ? (
                 <ThemedText style={{ color: theme.textSecondary }}>
                     No recommendations yet
                 </ThemedText>
             ) : (
-                recommended.map((item) => {
+                filteredRecommended.map((item) => {
                     const base = assetToLearningModule(item);
                     const stored = moduleMap.get(base.id);
 
