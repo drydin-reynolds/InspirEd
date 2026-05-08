@@ -37,7 +37,6 @@ import { askEducationalQuestion } from "@/utils/gemini";
 import { SearchBar } from "@/components/SearchBar";
 import { assetToLearningModule } from "@/utils/assetConvertion"
 import { openAssetPDF } from "../utils/openAsset";
-import { useEffect } from "react";
 import { buildCitationPdfUrl } from "@/utils/rag";
 
 /** Single-line body: compact like typical chat apps (line + minimal vertical padding). */
@@ -280,6 +279,10 @@ export default function EducationScreen() {
             setLoadingRecommended(false);
         }
     };
+
+    useEffect(() => {
+        fetchRecommended();
+    }, []);
 
   if (showChat) {
     return (
@@ -542,7 +545,7 @@ export default function EducationScreen() {
                         progress: stored?.progress ?? 0,
                     }}
                     onPress={() =>
-                        openAssetPDF(item.title, "http://10.205.227.129:3000" + item.file_path)
+                        openAssetPDF(item.title, process.env.EXPO_PUBLIC_API_URL + item.file_path)
                     }
                     onToggleComplete={toggleModuleComplete}
                 />
@@ -595,7 +598,7 @@ export default function EducationScreen() {
                             onPress={() =>
                                 openAssetPDF(
                                     item.title,
-                                    "http://10.205.227.129:3000" + item.file_path
+                                    process.env.EXPO_PUBLIC_API_URL + item.file_path
                                 )
                             }
                             onToggleComplete={toggleModuleComplete}
