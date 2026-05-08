@@ -34,6 +34,10 @@ import Animated, {
 } from "react-native-reanimated";
 import { useReanimatedKeyboardAnimation } from "react-native-keyboard-controller";
 import { askEducationalQuestion } from "@/utils/gemini";
+import { SearchBar } from "@/components/SearchBar";
+import { assetToLearningModule } from "@/utils/assetConvertion"
+import { openAssetPDF } from "../utils/openAsset";
+import { useEffect } from "react";
 import { buildCitationPdfUrl } from "@/utils/rag";
 
 /** Single-line body: compact like typical chat apps (line + minimal vertical padding). */
@@ -44,24 +48,27 @@ const CHAT_INPUT_MIN_HEIGHT = CHAT_INPUT_LINE_HEIGHT + CHAT_INPUT_PAD_V;
 const CHAT_INPUT_MAX_HEIGHT =
   CHAT_INPUT_LINE_HEIGHT * CHAT_INPUT_MAX_LINES + CHAT_INPUT_PAD_V;
 
-/** Scroll clearance below messages — must live on contentContainerStyle, not FlatList style. */
+/** Scroll clearance below messages � must live on contentContainerStyle, not FlatList style. */
 const CHAT_LIST_GAP_ABOVE_COMPOSER = Spacing.sm;
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export default function EducationScreen() {
   const { theme } = useTheme();
-  const {
-    learningModules,
-    educationChatMessages,
-    addEducationChatMessage,
-    readingLevel,
-  } = useAppContext();
+    const { learningModules, setLearningModules, educationChatMessages, addEducationChatMessage, readingLevel, toggleModuleComplete } =
+    useAppContext();
   const navigation = useNavigation<any>();
 
   const [showChat, setShowChat] = useState(false);
   const [inputText, setInputText] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [results, setResults] = useState<any[]>([]);
+  const [recommended, setRecommended] = useState<any[]>([]);
+    const [loadingRecommended, setLoadingRecommended] = useState(false);
+    const moduleMap = new Map(
+        learningModules.map((m) => [m.id, m])
+    );
 
   const completedCount = learningModules.filter((m) => m.completed).length;
   const totalCount = learningModules.length;
@@ -225,6 +232,54 @@ export default function EducationScreen() {
       setIsLoading(false);
     }
   };
+
+    const searchAssets = async (text: string) => {
+        if (!text.trim()) {
+            setResults([]);
+            return;
+        }
+        
+        const res = await fetch(
+            process.env.EXPO_PUBLIC_API_URL +`/assets/search/query?q=${encodeURIComponent(text)}`
+        );
+
+        const data = await res.json();
+        setResults(data);
+    };
+
+
+    const fetchRecommended = async () => {
+        try {
+            setLoadingRecommended(true);
+
+            const res = await fetch(
+                process.env.EXPO_PUBLIC_API_URL+"/assets/recommended"
+            );
+
+            const data = await res.json();
+
+            const modules = data.map(assetToLearningModule);
+            
+            setLearningModules((prev) => {
+                const existing = new Map(prev.map((m) => [m.id, m]));
+
+                modules.forEach((m: LearningModule) => {
+                    if (!existing.has(m.id)) {
+                        existing.set(m.id, m);
+                    }
+                });
+
+                return Array.from(existing.values());
+            });
+            
+            setRecommended(data);
+
+        } catch (err) {
+            console.error("Error fetching recommended:", err);
+        } finally {
+            setLoadingRecommended(false);
+        }
+    };
 
   if (showChat) {
     return (
@@ -461,43 +516,39 @@ export default function EducationScreen() {
   return (
     <ScreenScrollView>
       <View style={styles.container}>
-        <ThemedView
-          style={[
-            styles.progressCard,
-            {
-              backgroundColor: theme.primary,
-            },
-          ]}
-        >
-          <ThemedText style={styles.progressTitle}>
-            Your Learning Progress
-          </ThemedText>
-          <View style={styles.progressStats}>
-            <ThemedText style={styles.progressNumber}>
-              {completedCount}
-            </ThemedText>
-            <ThemedText style={styles.progressLabel}>
-              / {totalCount} modules completed
-            </ThemedText>
-          </View>
-          <View
-            style={[
-              styles.progressBar,
-              { backgroundColor: "rgba(255,255,255,0.3)" },
-            ]}
-          >
-            <View
-              style={[
-                styles.progressFill,
-                {
-                  backgroundColor: theme.accent,
-                  width: `${overallProgress}%`,
-                },
-              ]}
-            />
-          </View>
-        </ThemedView>
+        <SearchBar
+            value={searchText}
+            onChangeText={(t) => {
+                setSearchText(t);
+                searchAssets(t);
+            }}
+            placeholder="Search modules..."
+            onClear={() => {
+                setSearchText("");
+                setResults([]);
+            }}
+        />
 
+        {results.map((item) => {
+            const base = assetToLearningModule(item);
+            const stored = moduleMap.get(base.id);
+
+            return (
+                <ModuleCard
+                    key={base.id}
+                    module={{
+                        ...base,
+                        completed: stored?.completed ?? false,
+                        progress: stored?.progress ?? 0,
+                    }}
+                    onPress={() =>
+                        openAssetPDF(item.title, "http://10.205.227.129:3000" + item.file_path)
+                    }
+                    onToggleComplete={toggleModuleComplete}
+                />
+            );
+        })}
+        
         <View style={styles.actionButtons}>
           <Button onPress={() => setShowChat(true)} style={{ flex: 1 }}>
             <Icon name="chat" size={20} color="white" />
@@ -515,25 +566,45 @@ export default function EducationScreen() {
           </Pressable>
         </View>
 
-        {categories.map((category) => {
-          const categoryModules = learningModules.filter(
-            (m) => m.category === category,
-          );
-          return (
-            <View key={category} style={styles.categorySection}>
-              <ThemedText style={styles.categoryTitle}>{category}</ThemedText>
-              {categoryModules.map((module) => (
-                <ModuleCard
-                  key={module.id}
-                  module={module}
-                  onPress={() =>
-                    navigation.navigate("ModuleDetail", { moduleId: module.id })
-                  }
-                />
-              ))}
-            </View>
-          );
-        })}
+        <View style={styles.categorySection}>
+            <ThemedText style={styles.categoryTitle}>
+                Recommended for You
+            </ThemedText>
+
+            {loadingRecommended ? (
+                <ThemedText style={{ color: theme.textSecondary }}>
+                    Loading...
+                </ThemedText>
+            ) : recommended.length === 0 ? (
+                <ThemedText style={{ color: theme.textSecondary }}>
+                    No recommendations yet
+                </ThemedText>
+            ) : (
+                recommended.map((item) => {
+                    const base = assetToLearningModule(item);
+                    const stored = moduleMap.get(base.id);
+
+                    return (
+                        <ModuleCard
+                            key={base.id}
+                            module={{
+                                ...base,
+                                completed: stored?.completed ?? false,
+                                progress: stored?.progress ?? 0,
+                            }}
+                            onPress={() =>
+                                openAssetPDF(
+                                    item.title,
+                                    "http://10.205.227.129:3000" + item.file_path
+                                )
+                            }
+                            onToggleComplete={toggleModuleComplete}
+                        />
+                    );
+                })
+            )}
+        </View>
+
       </View>
     </ScreenScrollView>
   );
@@ -913,13 +984,7 @@ function CitationSection({
   );
 }
 
-function ModuleCard({
-  module,
-  onPress,
-}: {
-  module: LearningModule;
-  onPress: () => void;
-}) {
+function ModuleCard({ module, onPress, onToggleComplete }: { module: LearningModule; onPress: () => void; onToggleComplete: (id: string) => void; }) {
   const { theme } = useTheme();
   const scale = useSharedValue(1);
 
@@ -986,14 +1051,6 @@ function ModuleCard({
               {module.difficulty}
             </ThemedText>
           </View>
-          <View style={styles.durationContainer}>
-            <Icon name="time" size={14} color={theme.textSecondary} />
-            <ThemedText
-              style={[styles.durationText, { color: theme.textSecondary }]}
-            >
-              {module.duration}
-            </ThemedText>
-          </View>
         </View>
         {module.progress > 0 && !module.completed && (
           <View style={styles.progressContainer}>
@@ -1020,7 +1077,34 @@ function ModuleCard({
             </ThemedText>
           </View>
         )}
-      </View>
+          </View>
+
+          <View style={styles.completeContainer}>
+              <Pressable
+                  onPress={() => onToggleComplete(module.id)}
+                  style={[
+                      styles.completeButton,
+                      {
+                          borderColor: module.completed ? theme.success : theme.border,
+                          backgroundColor: module.completed ? theme.success + "20" : "transparent",
+                      },
+                  ]}
+              >
+                  <Icon
+                      name={module.completed ? "checkmark-circle" : "circle"}
+                      size={18}
+                      color={module.completed ? theme.success : theme.textSecondary}
+                  />
+                  <ThemedText
+                      style={{
+                          color: module.completed ? theme.success : theme.textSecondary,
+                          fontWeight: "600",
+                      }}
+                  >
+                      {module.completed ? "Completed" : "Mark Complete"}
+                  </ThemedText>
+              </Pressable>
+          </View>
     </AnimatedPressable>
   );
 }
@@ -1125,6 +1209,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: Spacing.md,
   },
+    completeContainer: {
+        marginTop: Spacing.sm,
+    },
+
+    completeButton: {
+        flexDirection: "row",
+        alignItems: "center",
+        gap: Spacing.sm,
+        paddingVertical: Spacing.sm,
+        paddingHorizontal: Spacing.md,
+        borderRadius: BorderRadius.sm,
+        borderWidth: 1,
+    },
   difficultyBadge: {
     paddingHorizontal: Spacing.sm,
     paddingVertical: Spacing.xs,
@@ -1307,4 +1404,13 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: Spacing.xs,
   },
+  searchResults: {
+      marginTop: 8,
+      gap: 12, 
+  },
+  searchItem: {
+      padding: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: "#eee",
+  }
 });

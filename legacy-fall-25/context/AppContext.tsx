@@ -129,6 +129,7 @@ type AppContextType = {
   getVideoWatchProgress: (videoId: string) => number;
   cachedVideos: CachedVideo[];
   setCachedVideos: (videos: CachedVideo[]) => void;
+  toggleModuleComplete: (id: string) => void;
 };
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -143,6 +144,7 @@ const STORAGE_KEYS = {
   PRIVACY_CONSENT_DATE: "@InspirEd:privacyConsentDate",
   VIDEO_WATCH_HISTORY: "@InspirEd:videoWatchHistory",
   CACHED_VIDEOS: "@InspirEd:cachedVideos",
+  LEARNING_MODULES: "@InspirEd:learningModules"
 };
 
 export function AppProvider({ children }: { children: ReactNode }) {
@@ -416,6 +418,29 @@ export function AppProvider({ children }: { children: ReactNode }) {
     );
   };
 
+    const toggleModuleComplete = (id: string) => {
+        setLearningModules((prev) => {
+            const updated = prev.map((module) =>
+                module.id === id
+                    ? {
+                        ...module,
+                        completed: !module.completed,
+                        progress: !module.completed ? 100 : 0, // optional but nice UX
+                    }
+                    : module
+            );
+
+            AsyncStorage.setItem(
+                STORAGE_KEYS.LEARNING_MODULES,
+                JSON.stringify(updated)
+            ).catch((error) =>
+                console.error("Error saving learning modules:", error)
+            );
+
+            return updated;
+        });
+    };
+
   const addEducationChatMessage = (message: Message) => {
     setEducationChatMessages((prev) => [...prev, message]);
   };
@@ -535,7 +560,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const loadStoredData = async () => {
       try {
-        const [storedOnboarding, storedLevel, storedVisits, storedChatMessages, storedQuestions, storedConsent, storedConsentDate, storedVideoHistory, storedCachedVideos] =
+          const [storedOnboarding, storedLevel, storedVisits, storedChatMessages, storedQuestions, storedConsent, storedConsentDate, storedVideoHistory, storedCachedVideos, storedModules] =
           await Promise.all([
             AsyncStorage.getItem(STORAGE_KEYS.ONBOARDING_COMPLETED),
             AsyncStorage.getItem(STORAGE_KEYS.READING_LEVEL),
@@ -546,6 +571,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
             AsyncStorage.getItem(STORAGE_KEYS.PRIVACY_CONSENT_DATE),
             AsyncStorage.getItem(STORAGE_KEYS.VIDEO_WATCH_HISTORY),
             AsyncStorage.getItem(STORAGE_KEYS.CACHED_VIDEOS),
+            AsyncStorage.getItem(STORAGE_KEYS.LEARNING_MODULES),
           ]);
 
         if (storedOnboarding === "true") {
@@ -607,6 +633,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           }));
           setCachedVideosState(videosWithDates);
         }
+        if (storedModules) {
+            setLearningModules(JSON.parse(storedModules));
+        }
+
       } catch (error) {
         console.error("Error loading stored data:", error);
       } finally {
@@ -662,6 +692,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         getVideoWatchProgress,
         cachedVideos,
         setCachedVideos,
+        toggleModuleComplete,
       }}
     >
       {children}
