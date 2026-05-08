@@ -21,6 +21,9 @@ export type Citation = {
   sourceTitle: string;
   excerpt: string;
   similarity: number;
+  /** Server path e.g. `/uploads/foo.pdf` — join with RAG_API_URL for fetching */
+  sourceFilePath?: string;
+  assetMongoId?: string;
 };
 
 export type Message = {

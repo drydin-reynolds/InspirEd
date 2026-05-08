@@ -13,7 +13,7 @@ interface TextSegment {
   italic?: boolean;
 }
 
-function parseInlineFormatting(text: string): TextSegment[] {
+export function parseInlineFormatting(text: string): TextSegment[] {
   const segments: TextSegment[] = [];
   let remaining = text;
 
@@ -26,14 +26,22 @@ function parseInlineFormatting(text: string): TextSegment[] {
     let matchContent = "";
     let matchLength = 0;
 
-    if (boldMatch && boldMatch.index !== undefined && boldMatch.index < firstMatchIndex) {
+    if (
+      boldMatch &&
+      boldMatch.index !== undefined &&
+      boldMatch.index < firstMatchIndex
+    ) {
       firstMatchIndex = boldMatch.index;
       matchType = "bold";
       matchContent = boldMatch[1];
       matchLength = boldMatch[0].length;
     }
 
-    if (italicMatch && italicMatch.index !== undefined && italicMatch.index < firstMatchIndex) {
+    if (
+      italicMatch &&
+      italicMatch.index !== undefined &&
+      italicMatch.index < firstMatchIndex
+    ) {
       firstMatchIndex = italicMatch.index;
       matchType = "italic";
       matchContent = italicMatch[1];
@@ -63,7 +71,12 @@ function parseInlineFormatting(text: string): TextSegment[] {
   return segments;
 }
 
-function renderLine(line: string, color: string, baseStyle: TextStyle, index: number) {
+function renderLine(
+  line: string,
+  color: string,
+  baseStyle: TextStyle,
+  index: number,
+) {
   const bulletMatch = line.match(/^(\s*)[-*]\s+(.*)$/);
   const numberMatch = line.match(/^(\s*)(\d+)[.)]\s+(.*)$/);
 
@@ -98,7 +111,7 @@ function renderLine(line: string, color: string, baseStyle: TextStyle, index: nu
     const segments = parseInlineFormatting(content);
     return (
       <View key={index} style={styles.listItem}>
-        <Text style={[baseStyle, { color }]}>{num}.  </Text>
+        <Text style={[baseStyle, { color }]}>{num}. </Text>
         <Text style={[baseStyle, { color, flex: 1 }]}>
           {segments.map((seg, i) => (
             <Text
@@ -139,7 +152,11 @@ function renderLine(line: string, color: string, baseStyle: TextStyle, index: nu
   );
 }
 
-export function MarkdownText({ children, style, color = "#000" }: MarkdownTextProps) {
+export function MarkdownText({
+  children,
+  style,
+  color = "#000",
+}: MarkdownTextProps) {
   if (!children || typeof children !== "string") {
     return null;
   }
