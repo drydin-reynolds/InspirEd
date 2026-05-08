@@ -10,6 +10,8 @@ The Expo app:
 - If **`RAG_API_URL`** / **`EXPO_PUBLIC_RAG_API_URL`** is set → uses **`/api/rag/retrieve`** and **`/api/rag/chat`** (Gemini key is still required on the **device** in prototype mode, or on the **server** via `GEMINI_API_KEY`).
 - If not set → falls back to bundled **`medical-knowledge.json`** and client-side embedding (previous behavior).
 
+**Secrets / env overview:** **[chatbot-environment.md](./chatbot-environment.md)**.
+
 | Piece | Location |
 |--------|-----------|
 | Chunk storage (ingested assets) | MongoDB collection **`chunks`** (Mongoose `Chunk`) |

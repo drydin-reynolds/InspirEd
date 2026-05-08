@@ -96,6 +96,14 @@ Expo will now embed the key at runtime.
 
 ---
 
+### Educational chatbot (RAG) — secrets checklist
+
+For **Learn → Ask AI** with grounded Mongo chunks, you need a **Gemini** key on the client and (usually) **asset-admin** running with **Mongo** + **Gemini**.  
+
+**Do not commit** real keys, `MONGO_URI`, or private URLs — see **[docs/chatbot-environment.md](docs/chatbot-environment.md)** for a full table and links to setup guides.
+
+---
+
 ### Optional (Video Library)
 
 ```
@@ -151,7 +159,7 @@ Scan the QR code with Expo Go to launch the app.
 
 Grounded answers can use:
 
-1. **MongoDB chunks (recommended)** — Upload assets in **`asset-admin`**, optionally generate embeddings on submit, or use **Browse → Generate embeddings**. Point the app at the server with **`RAG_API_URL`** or **`EXPO_PUBLIC_RAG_API_URL`** (see **[docs/rag-mongodb-setup.md](docs/rag-mongodb-setup.md)**).
+1. **MongoDB chunks (recommended)** — Upload assets in **`asset-admin`**, optionally generate embeddings on submit, or use **Browse → Generate embeddings**. Point the app at the server with **`RAG_API_URL`** or **`EXPO_PUBLIC_RAG_API_URL`** (see **[docs/rag-mongodb-setup.md](docs/rag-mongodb-setup.md)**). Required secrets and “do not commit” rules: **[docs/chatbot-environment.md](docs/chatbot-environment.md)**.
 
 2. **Bundled fallback** — Run `node scripts/process-pdfs.js` to refresh `assets/medical-knowledge.json`.
 
